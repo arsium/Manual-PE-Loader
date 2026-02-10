@@ -2,10 +2,9 @@
 
 //Function pointer
 
-int main()
+int main(void)
 {
-	const auto lpModule = MemoryLoader::LoadDLL((LPSTR)"DelayLoad.dll");
-
+	const auto lpModule = MemoryLoader::LoadPE((LPSTR)"DelayLoadExe.exe");//DelayLoad.dll
 	if (lpModule == nullptr)
 		return -1;
 

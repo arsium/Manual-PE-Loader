@@ -11,8 +11,8 @@ class MemoryLoader
 {
     public:
         // Main loader functions
-        static LPVOID       LoadDLL(const LPSTR lpDLLPath);
-        static BOOL         FreeDLL(const LPVOID lpModule);
+        static LPVOID       LoadPE(const LPSTR lpDLLPath);
+        static BOOL         FreePE(const LPVOID lpModule);
 
         // Custom GetProcAddress implementations (work on both system and manual PEs)
         static LPVOID       GetProcAddressByName(HMODULE hModule, LPSTR lpFunctionName);

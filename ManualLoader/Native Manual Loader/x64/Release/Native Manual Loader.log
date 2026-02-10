@@ -1,0 +1,13 @@
+﻿C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(538,5): warning MSB8028: The intermediate directory (x64\Release\) contains files shared from another project (Manual Loader.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  Loader.c
+  main.c
+C:\Users\arsium\Desktop\Exploit\ManualLoader\Native Manual Loader\Loader.c(130,9): warning C4013: 'RtlInitUnicodeString' undefined; assuming extern returning int
+C:\Users\arsium\Desktop\Exploit\ManualLoader\Native Manual Loader\Loader.c(133,18): warning C4013: 'LdrLoadDll' undefined; assuming extern returning int
+C:\Users\arsium\Desktop\Exploit\ManualLoader\Native Manual Loader\Loader.c(371,18): warning C4013: 'NtProtectVirtualMemory' undefined; assuming extern returning int
+C:\Users\arsium\Desktop\Exploit\ManualLoader\Native Manual Loader\Loader.c(857,14): warning C4013: 'NtAllocateVirtualMemory' undefined; assuming extern returning int
+  Generating code
+  0 of 14 functions ( 0.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  Native Manual Loader.vcxproj -> C:\Users\arsium\Desktop\Exploit\ManualLoader\x64\Release\Native Manual Loader.exe

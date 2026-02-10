@@ -1,0 +1,10 @@
+﻿C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v170\Microsoft.CppBuild.targets(538,5): warning MSB8028: The intermediate directory (x64\Release\) contains files shared from another project (Manual Loader.vcxproj).  This can lead to incorrect clean and rebuild behavior.
+  Loader.cpp
+C:\Users\arsium\Desktop\Exploit\ManualLoader\Modern Manual Loader\Loader.cpp(35,58): warning C4244: 'argument': conversion from 'const DWORD_PTR' to 'DWORD', possible loss of data
+  main.cpp
+  Generating code
+  1 of 16 functions ( 6.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    1 functions had inline decision re-evaluated but remain unchanged
+  Finished generating code
+  Modern Manual Loader.vcxproj -> C:\Users\arsium\Desktop\Exploit\ManualLoader\x64\Release\Modern Manual Loader.exe

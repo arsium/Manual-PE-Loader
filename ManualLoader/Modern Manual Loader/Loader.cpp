@@ -7,45 +7,45 @@
  */
 HANDLE MemoryLoader::GetFileContent(const LPSTR lpFilePath)
 {
-	const HANDLE hFile = CreateFileA(lpFilePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
-		printf("[-] An error occured when trying to open the PE file !\n");
-		CloseHandle(hFile);
-		return nullptr;
-	}
+    const HANDLE hFile = CreateFileA(lpFilePath, GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        printf("[-] An error occured when trying to open the PE file !\n");
+        CloseHandle(hFile);
+        return nullptr;
+    }
 
-	const DWORD_PTR dFileSize = GetFileSize(hFile, nullptr);
-	if (dFileSize == INVALID_FILE_SIZE)
-	{
-		printf("[-] An error occured when trying to get the PE file size !\n");
-		CloseHandle(hFile);
-		return nullptr;
-	}
+    const DWORD_PTR dFileSize = GetFileSize(hFile, nullptr);
+    if (dFileSize == INVALID_FILE_SIZE)
+    {
+        printf("[-] An error occured when trying to get the PE file size !\n");
+        CloseHandle(hFile);
+        return nullptr;
+    }
 
-	const HANDLE hFileContent = HeapAlloc(GetProcessHeap(), 0, dFileSize);
-	if (hFileContent == INVALID_HANDLE_VALUE)
-	{
-		printf("[-] An error occured when trying to allocate memory for the PE file content !\n");
-		CloseHandle(hFile);
-		CloseHandle(hFileContent);
-		return nullptr;
-	}
+    const HANDLE hFileContent = HeapAlloc(GetProcessHeap(), 0, dFileSize);
+    if (hFileContent == INVALID_HANDLE_VALUE)
+    {
+        printf("[-] An error occured when trying to allocate memory for the PE file content !\n");
+        CloseHandle(hFile);
+        CloseHandle(hFileContent);
+        return nullptr;
+    }
 
-	const BOOL bFileRead = ReadFile(hFile, hFileContent, dFileSize, nullptr, nullptr);
-	if (!bFileRead)
-	{
-		printf("[-] An error occured when trying to read the PE file content !\n");
+    const BOOL bFileRead = ReadFile(hFile, hFileContent, dFileSize, nullptr, nullptr);
+    if (!bFileRead)
+    {
+        printf("[-] An error occured when trying to read the PE file content !\n");
 
-		CloseHandle(hFile);
-		if (hFileContent != nullptr)
-			CloseHandle(hFileContent);
+        CloseHandle(hFile);
+        if (hFileContent != nullptr)
+            CloseHandle(hFileContent);
 
-		return nullptr;
-	}
+        return nullptr;
+    }
 
-	CloseHandle(hFile);
-	return hFileContent;
+    CloseHandle(hFile);
+    return hFileContent;
 }
 
 /**
@@ -55,12 +55,12 @@ HANDLE MemoryLoader::GetFileContent(const LPSTR lpFilePath)
  */
 BOOL MemoryLoader::IsValidPE(const LPVOID lpImage)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
-	if (lpImageNTHeader->Signature == IMAGE_NT_SIGNATURE)
-		return TRUE;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->Signature == IMAGE_NT_SIGNATURE)
+        return TRUE;
 
-	return FALSE;
+    return FALSE;
 }
 
 /**
@@ -70,13 +70,13 @@ BOOL MemoryLoader::IsValidPE(const LPVOID lpImage)
  */
 BOOL MemoryLoader::IsDLL(const LPVOID hDLLData)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)(hDLLData);
-	const auto lpImageNtHeader = (PIMAGE_NT_HEADERS32)((DWORD_PTR)hDLLData + lpImageDOSHeader->e_lfanew);
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)(hDLLData);
+    const auto lpImageNtHeader = (PIMAGE_NT_HEADERS32)((DWORD_PTR)hDLLData + lpImageDOSHeader->e_lfanew);
 
-	if (lpImageNtHeader->FileHeader.Characteristics & IMAGE_FILE_DLL)
-		return TRUE;
+    if (lpImageNtHeader->FileHeader.Characteristics & IMAGE_FILE_DLL)
+        return TRUE;
 
-	return FALSE;
+    return FALSE;
 }
 
 /**
@@ -86,12 +86,12 @@ BOOL MemoryLoader::IsDLL(const LPVOID hDLLData)
  */
 BOOL MemoryLoader::IsValidArch(const LPVOID lpImage)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
-	if (lpImageNTHeader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR_MAGIC)
-		return TRUE;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR_MAGIC)
+        return TRUE;
 
-	return FALSE;
+    return FALSE;
 }
 
 /**
@@ -101,18 +101,23 @@ BOOL MemoryLoader::IsValidArch(const LPVOID lpImage)
  */
 DWORD_PTR MemoryLoader::GetImageSize(const LPVOID lpImage)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
-	return lpImageNTHeader->OptionalHeader.SizeOfImage;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    return lpImageNTHeader->OptionalHeader.SizeOfImage;
 }
 
+/**
+ *	Function to identify if the PE file contains TLS callback directory.
+ *	\param lpImage : PE image data.
+ *	\return : true if TLS callback directory is present, FALSE otherwise.
+ */
 BOOL MemoryLoader::HasCallbacks(const LPVOID lpImage)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
-	const DWORD_PTR dVirtualAddress = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+    const DWORD_PTR dVirtualAddress = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress;
 
-	return dVirtualAddress != 0;
+    return dVirtualAddress != 0;
 }
 
 // ============================================================================
@@ -465,244 +470,6 @@ LPVOID MemoryLoader::GetFunctionAddressEx(const LPVOID lpModule, const LPSTR lpF
     return nullptr;
 }
 
-/**
- *	Function to load a DLL in memory
- *	\param lpDLLPath : path of the DLL file.
- *	\return : DLL address if success else nullptr.
- */
-LPVOID MemoryLoader::LoadDLL(const LPSTR lpDLLPath)
-{
-    printf("[+] DLL LOADER\n");
-
-    const HANDLE hDLLData = GetFileContent(lpDLLPath);
-    if (hDLLData == INVALID_HANDLE_VALUE || hDLLData == nullptr)
-    {
-        printf("[-] An error occurred when trying to get DLL's data!\n");
-        return nullptr;
-    }
-
-    printf("[+] DLL's data at 0x%p\n", (LPVOID)hDLLData);
-
-    if (!IsValidPE(hDLLData))
-    {
-        printf("[-] The DLL is not a valid PE file!\n");
-        if (hDLLData != nullptr)
-            HeapFree(GetProcessHeap(), 0, hDLLData);
-        return nullptr;
-    }
-
-    printf("[+] The PE image is valid.\n");
-
-    if (!IsValidArch(hDLLData))
-    {
-        printf("[-] The architectures are not compatible!\n");
-        return nullptr;
-    }
-
-    printf("[+] The architectures are compatible.\n");
-
-    // Parse file buffer headers
-    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)hDLLData;
-    const auto lpImageNTHeaderFile = (PIMAGE_NT_HEADERS)((DWORD_PTR)hDLLData + lpImageDOSHeader->e_lfanew);
-    const auto lpImageSectionHeaderFile = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageNTHeaderFile + 4 + sizeof(IMAGE_FILE_HEADER) + lpImageNTHeaderFile->FileHeader.SizeOfOptionalHeader);
-
-    const DWORD_PTR dImageSize = lpImageNTHeaderFile->OptionalHeader.SizeOfImage;
-    const DWORD_PTR dOriginalImageBase = lpImageNTHeaderFile->OptionalHeader.ImageBase;
-
-    printf("[+] PE image size: 0x%x\n", (UINT)dImageSize);
-
-    // Allocate memory for PE
-    const LPVOID lpAllocAddress = VirtualAlloc(nullptr, dImageSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-    if (lpAllocAddress == nullptr)
-    {
-        printf("[-] An error occurred when trying to allocate the DLL's memory!\n");
-        return nullptr;
-    }
-
-    printf("[+] DLL memory allocated at 0x%p\n", (LPVOID)lpAllocAddress);
-
-    // Calculate delta for relocations
-    const DWORD_PTR dDeltaAddress = (DWORD_PTR)lpAllocAddress - dOriginalImageBase;
-
-    // Copy PE headers
-    RtlCopyMemory(lpAllocAddress, hDLLData, lpImageNTHeaderFile->OptionalHeader.SizeOfHeaders);
-
-    // NOW we can safely access headers in lpAllocAddress
-    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpAllocAddress + lpImageDOSHeader->e_lfanew);
-    lpImageNTHeader->OptionalHeader.ImageBase = (DWORD_PTR)lpAllocAddress;  // Update in loaded image
-
-    // Copy sections
-    printf("[+] Copying sections...\n");
-    for (int i = 0; i < lpImageNTHeaderFile->FileHeader.NumberOfSections; i++)
-    {
-        const auto lpCurrentSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageSectionHeaderFile + (i * sizeof(IMAGE_SECTION_HEADER)));
-
-        if (lpCurrentSectionHeader->SizeOfRawData > 0)
-        {
-            RtlCopyMemory(
-                (LPVOID)((DWORD_PTR)lpAllocAddress + lpCurrentSectionHeader->VirtualAddress),
-                (LPVOID)((DWORD_PTR)hDLLData + lpCurrentSectionHeader->PointerToRawData),
-                lpCurrentSectionHeader->SizeOfRawData
-            );
-        }
-
-        printf("[+] Section %s written.\n", (LPSTR)lpCurrentSectionHeader->Name);
-    }
-
-    // Process relocations (using headers from lpAllocAddress now)
-    const IMAGE_DATA_DIRECTORY ImageDataReloc = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
-
-    if (ImageDataReloc.VirtualAddress != 0 && ImageDataReloc.Size != 0 && dDeltaAddress != 0)
-    {
-        printf("[+] Processing relocations...\n");
-
-        IMAGE_BASE_RELOCATION* pRelocTable = (IMAGE_BASE_RELOCATION*)((DWORD_PTR)lpAllocAddress + ImageDataReloc.VirtualAddress);
-
-        while (pRelocTable->VirtualAddress != 0)
-        {
-            if (pRelocTable->SizeOfBlock == 0)
-                break;
-
-            DWORD sizeOfTable = (pRelocTable->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / 2;
-            WORD* reloc = (WORD*)(pRelocTable + 1);
-
-            for (DWORD i = 0; i < sizeOfTable; ++i)
-            {
-                int type = reloc[i] >> 12;
-                int offset = reloc[i] & 0x0fff;
-
-                if (type == IMAGE_REL_BASED_DIR64)  // 10 for x64
-                {
-                    DWORD_PTR* addressToChange = (DWORD_PTR*)((DWORD_PTR)lpAllocAddress + pRelocTable->VirtualAddress + offset);
-                    *addressToChange += dDeltaAddress;
-                }
-            }
-
-            pRelocTable = (IMAGE_BASE_RELOCATION*)(((DWORD_PTR)pRelocTable) + pRelocTable->SizeOfBlock);
-        }
-
-        printf("[+] Relocations applied.\n");
-    }
-    else
-    {
-        printf("[+] No relocations needed.\n");
-    }
-
-    // Process imports
-    const IMAGE_DATA_DIRECTORY ImageDataImport = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-
-    if (ImageDataImport.VirtualAddress != 0 && ImageDataImport.Size != 0)
-    {
-        printf("[+] Processing imports...\n");
-
-        auto lpImageImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD_PTR)lpAllocAddress + ImageDataImport.VirtualAddress);
-
-        while (lpImageImportDescriptor->Name != 0)
-        {
-            const auto lpLibraryName = (LPSTR)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->Name);
-            const HMODULE hModule = LoadLibraryA(lpLibraryName);
-            if (hModule == nullptr)
-            {
-                printf("[-] Failed to load %s DLL!\n", lpLibraryName);
-                return nullptr;
-            }
-
-            printf("[+] Loading %s\n", lpLibraryName);
-
-            auto lpThunkData = (PIMAGE_THUNK_DATA)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->FirstThunk);
-            while (lpThunkData->u1.AddressOfData != 0)
-            {
-                if (IMAGE_SNAP_BY_ORDINAL(lpThunkData->u1.Ordinal))
-                {
-                    const auto functionOrdinal = (UINT)IMAGE_ORDINAL(lpThunkData->u1.Ordinal);
-                    lpThunkData->u1.Function = (DWORD_PTR)GetProcAddressByOrdinal(hModule,functionOrdinal);
-                    printf("[+]\tFunction Ordinal %u\n", functionOrdinal);
-                }
-                else
-                {
-                    const auto lpData = (PIMAGE_IMPORT_BY_NAME)((DWORD_PTR)lpAllocAddress + lpThunkData->u1.AddressOfData);
-                    const auto functionAddress = (DWORD_PTR)GetProcAddressByName(hModule, lpData->Name);
-                    lpThunkData->u1.Function = functionAddress;
-                    printf("[+]\tFunction %s\n", (LPSTR)lpData->Name);
-                }
-                lpThunkData++;
-            }
-            lpImageImportDescriptor++;
-        }
-    }
-    else
-    {
-        printf("[+] No imports found.\n");
-    }
-
-    // Process delay-load imports
-    if (!ProcessDelayImports(lpAllocAddress))
-    {
-        printf("[-] Failed to process delay imports!\n");
-        return nullptr;
-    }
-
-    // Process Load Config directory
-    if (!ProcessLoadConfig(lpAllocAddress))
-    {
-        printf("[-] Failed to process Load Config!\n");
-        return nullptr;
-    }
-
-    // Register exception handlers (critical for x64)
-    if (!RegisterExceptionHandlers(lpAllocAddress))
-    {
-        printf("[-] Failed to register exception handlers!\n");
-        return nullptr;
-    }
-
-    // Apply section protections (MUST BE LAST before calling any code)
-    if (!ApplySectionProtections(lpAllocAddress))
-    {
-        printf("[-] Failed to apply section protections!\n");
-        return nullptr;
-    }
-
-    // TLS Callbacks
-    if (HasCallbacks(lpAllocAddress))  // Use lpAllocAddress, not hDLLData
-    {
-        const auto lpImageTLSDirectory = (PIMAGE_TLS_DIRECTORY)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
-        auto lpCallbackArray = (PIMAGE_TLS_CALLBACK*)lpImageTLSDirectory->AddressOfCallBacks;
-
-        while (*lpCallbackArray != nullptr)
-        {
-            const auto lpImageCallback = *lpCallbackArray;
-            lpImageCallback(lpAllocAddress, DLL_PROCESS_ATTACH, nullptr);
-            lpCallbackArray++;
-        }
-        printf("[+] TLS callbacks executed (DLL_PROCESS_ATTACH).\n");
-    }
-
-    // Call entry point
-    const BOOL bIsDLL = (lpImageNTHeader->FileHeader.Characteristics & IMAGE_FILE_DLL) != 0;
-
-    if (bIsDLL)
-    {
-        const auto main = (dllmain)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
-        const BOOL result = main((HINSTANCE)lpAllocAddress, DLL_PROCESS_ATTACH, nullptr);
-        if (!result)
-        {
-            printf("[-] DllMain returned FALSE!\n");
-            return nullptr;
-        }
-        printf("[+] DllMain called (DLL_PROCESS_ATTACH).\n");
-        printf("[+] DLL loaded successfully.\n");
-    }
-    else
-    {
-        printf("[+] EXE loaded successfully (entry point NOT executed).\n");
-        printf("[!] Entry point: 0x%p\n",
-            (LPVOID)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint));
-    }
-
-    HeapFree(GetProcessHeap(), 0, hDLLData);
-    return (LPVOID)lpAllocAddress;
-}
 
 /**
  * Custom GetProcAddress - Works on both system and manually-loaded modules
@@ -890,7 +657,6 @@ LPVOID MemoryLoader::GetProcAddressByOrdinal(const HMODULE hModule, const WORD o
     return (LPVOID)((DWORD_PTR)hModule + functionRVA);
 }
 
-
 /**
  *	Function to find function in the DLL.
  *	\param lpModule : address of the DLL.
@@ -899,24 +665,24 @@ LPVOID MemoryLoader::GetProcAddressByOrdinal(const HMODULE hModule, const WORD o
  */
 LPVOID MemoryLoader::GetFunctionAddress(const LPVOID lpModule, const LPSTR lpFunctionName)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
-	if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
-		return nullptr;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return nullptr;
 
-	const auto lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
-	const DWORD_PTR dNumberOfNames = lpImageExportDirectory->NumberOfNames;
+    const auto lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    const DWORD_PTR dNumberOfNames = lpImageExportDirectory->NumberOfNames;
 
-	for (int i = 0; i < (int)dNumberOfNames; i++)
-	{
-		const auto lpCurrentFunctionName = (LPSTR)(((DWORD*)(lpImageExportDirectory->AddressOfNames + (DWORD_PTR)lpModule))[i] + (DWORD_PTR)lpModule);
-		const auto lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
-		const auto addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
-		if (strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
-			return (LPVOID)((DWORD_PTR)lpModule + addRVA);
-	}
+    for (int i = 0; i < (int)dNumberOfNames; i++)
+    {
+        const auto lpCurrentFunctionName = (LPSTR)(((DWORD*)(lpImageExportDirectory->AddressOfNames + (DWORD_PTR)lpModule))[i] + (DWORD_PTR)lpModule);
+        const auto lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
+        const auto addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
+        if (strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+            return (LPVOID)((DWORD_PTR)lpModule + addRVA);
+    }
 
-	return nullptr;
+    return nullptr;
 }
 
 /**
@@ -927,15 +693,15 @@ LPVOID MemoryLoader::GetFunctionAddress(const LPVOID lpModule, const LPSTR lpFun
  */
 LPVOID MemoryLoader::GetFunctionAddressByOrdinal(const LPVOID lpModule, const DWORD_PTR dOrdinal)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
-	if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
-		return nullptr;
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return nullptr;
 
-	const auto lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    const auto lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
 
-	const auto addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[dOrdinal];
-	return (LPVOID)((DWORD_PTR)lpModule + addRVA);
+    const auto addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[dOrdinal];
+    return (LPVOID)((DWORD_PTR)lpModule + addRVA);
 }
 
 /**
@@ -943,45 +709,439 @@ LPVOID MemoryLoader::GetFunctionAddressByOrdinal(const LPVOID lpModule, const DW
  *	\param lpModule : address of the loaded DLL.
  *	\return : FALSE if it failed else TRUE.
  */
-BOOL MemoryLoader::FreeDLL(const LPVOID lpModule)
+BOOL MemoryLoader::FreePE(const LPVOID lpModule)
 {
-	const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
-	const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
 
-	if (HasCallbacks(lpModule))
-	{
-		const auto lpImageTLSDirectory = (PIMAGE_TLS_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
-		auto lpCallbackArray = (PIMAGE_TLS_CALLBACK*)lpImageTLSDirectory->AddressOfCallBacks;
+    if (HasCallbacks(lpModule))
+    {
+        const auto lpImageTLSDirectory = (PIMAGE_TLS_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
+        auto lpCallbackArray = (PIMAGE_TLS_CALLBACK*)lpImageTLSDirectory->AddressOfCallBacks;
 
-		while (*lpCallbackArray != nullptr)
-		{
-			const auto lpImageCallback = *lpCallbackArray;
-			lpImageCallback(lpModule, DLL_PROCESS_DETACH, nullptr);
-			lpCallbackArray++;
-		}
+        while (*lpCallbackArray != nullptr)
+        {
+            const auto lpImageCallback = *lpCallbackArray;
+            lpImageCallback(lpModule, DLL_PROCESS_DETACH, nullptr);
+            lpCallbackArray++;
+        }
 
-		printf("[+] TLS callbacks executed (DLL_PROCESS_DETACH).\n");
-	}
+        printf("[+] TLS callbacks executed (DLL_PROCESS_DETACH).\n");
+    }
 
-	const auto main = (dllmain)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
-	const BOOL result = main((HINSTANCE)lpModule, DLL_PROCESS_DETACH, nullptr);
+    const auto main = (dllmain)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
+    const BOOL result = main((HINSTANCE)lpModule, DLL_PROCESS_DETACH, nullptr);
 
-	if (!result)
-	{
-		printf("[-] An error is occured when trying to call dllmain with DLL_PROCESS_DETACH !\n");
-		return FALSE;
-	}
+    if (!result)
+    {
+        printf("[-] An error is occured when trying to call dllmain with DLL_PROCESS_DETACH !\n");
+        return FALSE;
+    }
 
-	printf("[+] dllmain have been called (DLL_PROCESS_DETACH).\n");
+    printf("[+] dllmain have been called (DLL_PROCESS_DETACH).\n");
 
-	const BOOL bFree = VirtualFree(lpModule, 0, MEM_RELEASE);
-	if (!bFree)
-	{
-		printf("[-] An error is occured when trying to free the DLL !\n");
-		return FALSE;
-	}
+    const BOOL bFree = VirtualFree(lpModule, 0, MEM_RELEASE);
+    if (!bFree)
+    {
+        printf("[-] An error is occured when trying to free the DLL !\n");
+        return FALSE;
+    }
 
-	printf("[+] DLL unloaded successfully !\n");
+    printf("[+] DLL unloaded successfully !\n");
 
-	return TRUE;
+    return TRUE;
+}
+
+/**
+ *	Function to load a DLL in memory
+ *	\param lpDLLPath : path of the DLL file.
+ *	\return : DLL address if success else nullptr.
+ */
+LPVOID MemoryLoader::LoadPE(const LPSTR lpPEPath)
+{
+    printf("[+] PE LOADER\n");
+
+    const HANDLE hPEData = GetFileContent(lpPEPath);
+    if (hPEData == INVALID_HANDLE_VALUE || hPEData == nullptr)
+    {
+        printf("[-] An error occurred when trying to get DLL's data!\n");
+        return nullptr;
+    }
+
+    printf("[+] DLL's data at 0x%p\n", (LPVOID)hPEData);
+
+    if (!IsValidPE(hPEData))
+    {
+        printf("[-] The DLL is not a valid PE file!\n");
+        if (hPEData != nullptr)
+            HeapFree(GetProcessHeap(), 0, hPEData);
+        return nullptr;
+    }
+
+    printf("[+] The PE image is valid.\n");
+
+    if (!IsValidArch(hPEData))
+    {
+        printf("[-] The architectures are not compatible!\n");
+        return nullptr;
+    }
+
+    printf("[+] The architectures are compatible.\n");
+
+    // Parse file buffer headers
+    const auto lpImageDOSHeader = (PIMAGE_DOS_HEADER)hPEData;
+    const auto lpImageNTHeaderFile = (PIMAGE_NT_HEADERS)((DWORD_PTR)hPEData + lpImageDOSHeader->e_lfanew);
+    const auto lpImageSectionHeaderFile = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageNTHeaderFile + 4 + sizeof(IMAGE_FILE_HEADER) + lpImageNTHeaderFile->FileHeader.SizeOfOptionalHeader);
+
+    const DWORD_PTR dImageSize = lpImageNTHeaderFile->OptionalHeader.SizeOfImage;
+    const DWORD_PTR dOriginalImageBase = lpImageNTHeaderFile->OptionalHeader.ImageBase;
+
+    printf("[+] PE image size: 0x%x\n", (UINT)dImageSize);
+
+    // Allocate memory for PE
+    const LPVOID lpAllocAddress = VirtualAlloc(nullptr, dImageSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (lpAllocAddress == nullptr)
+    {
+        printf("[-] An error occurred when trying to allocate the DLL's memory!\n");
+        return nullptr;
+    }
+
+    printf("[+] DLL memory allocated at 0x%p\n", (LPVOID)lpAllocAddress);
+
+    // Calculate delta for relocations
+    const DWORD_PTR dDeltaAddress = (DWORD_PTR)lpAllocAddress - dOriginalImageBase;
+
+    // Copy PE headers
+    RtlCopyMemory(lpAllocAddress, hPEData, lpImageNTHeaderFile->OptionalHeader.SizeOfHeaders);
+
+    // NOW we can safely access headers in lpAllocAddress
+    const auto lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpAllocAddress + lpImageDOSHeader->e_lfanew);
+    lpImageNTHeader->OptionalHeader.ImageBase = (DWORD_PTR)lpAllocAddress;  // Update in loaded image
+
+    printf("[+] Copying sections...\n");
+    for (int i = 0; i < lpImageNTHeaderFile->FileHeader.NumberOfSections; i++)
+    {
+        const auto lpCurrentSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageSectionHeaderFile + (i * sizeof(IMAGE_SECTION_HEADER)));
+
+        LPVOID lpSectionDest = (LPVOID)((DWORD_PTR)lpAllocAddress + lpCurrentSectionHeader->VirtualAddress);
+        SIZE_T virtualSize = lpCurrentSectionHeader->Misc.VirtualSize;
+        SIZE_T rawSize = lpCurrentSectionHeader->SizeOfRawData;
+
+        // Always zero-initialize the FULL virtual size first
+        if (virtualSize > 0)
+        {
+            RtlZeroMemory(lpSectionDest, virtualSize);
+        }
+
+        // Then copy raw data if it exists
+        if (rawSize > 0 && lpCurrentSectionHeader->PointerToRawData > 0)
+        {
+            SIZE_T copySize = min(rawSize, virtualSize);
+            RtlCopyMemory(
+                lpSectionDest,
+                (LPVOID)((DWORD_PTR)hPEData + lpCurrentSectionHeader->PointerToRawData),
+                copySize
+            );
+            printf("[+] Section %s: Copied 0x%x bytes (VirtualSize=0x%x)\n",
+                (LPSTR)lpCurrentSectionHeader->Name, (UINT)copySize, (UINT)virtualSize);
+        }
+        else
+        {
+            printf("[+] Section %s: Zero-initialized virtual section (0x%x bytes)\n",
+                (LPSTR)lpCurrentSectionHeader->Name, (UINT)virtualSize);
+        }
+    }
+
+
+    // Process relocations (using headers from lpAllocAddress now)
+    const IMAGE_DATA_DIRECTORY ImageDataReloc = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+    if (ImageDataReloc.VirtualAddress != 0 && ImageDataReloc.Size != 0 && dDeltaAddress != 0)
+    {
+        printf("[+] Processing relocations...\n");
+
+        IMAGE_BASE_RELOCATION* pRelocTable = (IMAGE_BASE_RELOCATION*)((DWORD_PTR)lpAllocAddress + ImageDataReloc.VirtualAddress);
+
+        while (pRelocTable->VirtualAddress != 0)
+        {
+            if (pRelocTable->SizeOfBlock == 0)
+                break;
+
+            DWORD sizeOfTable = (pRelocTable->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / 2;
+            WORD* reloc = (WORD*)(pRelocTable + 1);
+
+            for (DWORD i = 0; i < sizeOfTable; ++i)
+            {
+                int type = reloc[i] >> 12;
+                int offset = reloc[i] & 0x0fff;
+
+                if (type == IMAGE_REL_BASED_DIR64)  // 10 for x64
+                {
+                    DWORD_PTR* addressToChange = (DWORD_PTR*)((DWORD_PTR)lpAllocAddress + pRelocTable->VirtualAddress + offset);
+                    *addressToChange += dDeltaAddress;
+                }
+            }
+
+            pRelocTable = (IMAGE_BASE_RELOCATION*)(((DWORD_PTR)pRelocTable) + pRelocTable->SizeOfBlock);
+        }
+
+        printf("[+] Relocations applied.\n");
+    }
+    else
+    {
+        printf("[+] No relocations needed.\n");
+    }
+
+    // Process imports
+    const IMAGE_DATA_DIRECTORY ImageDataImport = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+
+    if (ImageDataImport.VirtualAddress != 0 && ImageDataImport.Size != 0)
+    {
+        printf("[+] Processing imports...\n");
+
+        auto lpImageImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD_PTR)lpAllocAddress + ImageDataImport.VirtualAddress);
+
+        while (lpImageImportDescriptor->Name != 0)
+        {
+            const auto lpLibraryName = (LPSTR)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->Name);
+            const HMODULE hModule = LoadLibraryA(lpLibraryName);
+            if (hModule == nullptr)
+            {
+                printf("[-] Failed to load %s DLL!\n", lpLibraryName);
+                return nullptr;
+            }
+
+            printf("[+] Loading %s\n", lpLibraryName);
+
+            auto lpThunkData = (PIMAGE_THUNK_DATA)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->FirstThunk);
+            while (lpThunkData->u1.AddressOfData != 0)
+            {
+                if (IMAGE_SNAP_BY_ORDINAL(lpThunkData->u1.Ordinal))
+                {
+                    const auto functionOrdinal = (UINT)IMAGE_ORDINAL(lpThunkData->u1.Ordinal);
+                    lpThunkData->u1.Function = (DWORD_PTR)GetProcAddressByOrdinal(hModule, functionOrdinal);
+                    printf("[+]\tFunction Ordinal %u\n", functionOrdinal);
+                }
+                else
+                {
+                    const auto lpData = (PIMAGE_IMPORT_BY_NAME)((DWORD_PTR)lpAllocAddress + lpThunkData->u1.AddressOfData);
+                    const auto functionAddress = (DWORD_PTR)GetProcAddressByName(hModule, lpData->Name);
+                    lpThunkData->u1.Function = functionAddress;
+                    printf("[+]\tFunction %s\n", (LPSTR)lpData->Name);
+                }
+                lpThunkData++;
+            }
+            lpImageImportDescriptor++;
+        }
+    }
+    else
+    {
+        printf("[+] No imports found.\n");
+    }
+
+    // Process delay-load imports
+    if (!ProcessDelayImports(lpAllocAddress))
+    {
+        printf("[-] Failed to process delay imports!\n");
+        return nullptr;
+    }
+
+    // Process Load Config directory
+    if (!ProcessLoadConfig(lpAllocAddress))
+    {
+        printf("[-] Failed to process Load Config!\n");
+        return nullptr;
+    }
+
+    // Register exception handlers (critical for x64)
+    if (!RegisterExceptionHandlers(lpAllocAddress))
+    {
+        printf("[-] Failed to register exception handlers!\n");
+        return nullptr;
+    }
+
+    // Apply section protections (MUST BE LAST before calling any code)
+    if (!ApplySectionProtections(lpAllocAddress))
+    {
+        printf("[-] Failed to apply section protections!\n");
+        return nullptr;
+    }
+
+    if (HasCallbacks(lpAllocAddress))
+    {
+        printf("[+] Processing TLS callbacks...\n");
+
+        const auto lpImageTLSDirectory = (PIMAGE_TLS_DIRECTORY64)((DWORD_PTR)lpAllocAddress +
+            lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
+
+        // Get original ImageBase from file
+        const auto lpImageDOSHeaderFile = (PIMAGE_DOS_HEADER)hPEData;
+        const auto lpImageNTHeaderFile = (PIMAGE_NT_HEADERS)((DWORD_PTR)hPEData + lpImageDOSHeaderFile->e_lfanew);
+        const DWORD_PTR originalImageBase = lpImageNTHeaderFile->OptionalHeader.ImageBase;
+        const DWORD_PTR currentImageBase = (DWORD_PTR)lpAllocAddress;
+        const DWORD_PTR delta = currentImageBase - originalImageBase;
+        const DWORD_PTR imageEnd = currentImageBase + lpImageNTHeader->OptionalHeader.SizeOfImage;
+
+        printf("[+] TLS Relocation Info:\n");
+        printf("    Original ImageBase: 0x%llx\n", originalImageBase);
+        printf("    Current ImageBase:  0x%llx\n", currentImageBase);
+        printf("    Delta:              0x%llx\n", delta);
+
+        // Validate TLS directory
+        BYTE* tlsBytes = (BYTE*)lpImageTLSDirectory;
+        BOOL isAllZeros = TRUE;
+        for (size_t i = 0; i < sizeof(IMAGE_TLS_DIRECTORY64); i++)
+        {
+            if (tlsBytes[i] != 0)
+            {
+                isAllZeros = FALSE;
+                break;
+            }
+        }
+
+        if (isAllZeros)
+        {
+            printf("[!] TLS directory is all zeros. Skipping.\n");
+        }
+        else if (lpImageTLSDirectory->AddressOfCallBacks == 0)
+        {
+            printf("[+] No TLS callbacks (AddressOfCallBacks = 0).\n");
+        }
+        else
+        {
+            PIMAGE_TLS_CALLBACK* lpCallbackArray = NULL;
+
+            printf("[+] AddressOfCallBacks in TLS directory: 0x%llx\n", lpImageTLSDirectory->AddressOfCallBacks);
+
+            // Check if AddressOfCallBacks has already been relocated
+            if (lpImageTLSDirectory->AddressOfCallBacks >= currentImageBase &&
+                lpImageTLSDirectory->AddressOfCallBacks < imageEnd)
+            {
+                // Already relocated by base relocations - use as-is
+                lpCallbackArray = (PIMAGE_TLS_CALLBACK*)lpImageTLSDirectory->AddressOfCallBacks;
+                printf("[+]   -> Already relocated, using directly: 0x%p\n", (LPVOID)lpCallbackArray);
+            }
+            else if (lpImageTLSDirectory->AddressOfCallBacks >= originalImageBase &&
+                lpImageTLSDirectory->AddressOfCallBacks < (originalImageBase + lpImageNTHeaderFile->OptionalHeader.SizeOfImage))
+            {
+                // Still points to original ImageBase - relocate it
+                lpCallbackArray = (PIMAGE_TLS_CALLBACK*)(lpImageTLSDirectory->AddressOfCallBacks + delta);
+                printf("[+]   -> Not relocated, applying delta: 0x%p\n", (LPVOID)lpCallbackArray);
+            }
+            else
+            {
+                // Invalid address
+                printf("[-]   -> Invalid AddressOfCallBacks (not in original or current range)\n");
+                lpCallbackArray = NULL;
+            }
+
+            if (lpCallbackArray == NULL ||
+                (DWORD_PTR)lpCallbackArray < currentImageBase ||
+                (DWORD_PTR)lpCallbackArray >= imageEnd)
+            {
+                printf("[-] Callback array pointer invalid or outside image bounds. Skipping TLS.\n");
+            }
+            else
+            {
+                printf("[+] TLS Callback array at: 0x%p\n", (LPVOID)lpCallbackArray);
+
+                int callbackCount = 0;
+                while (callbackCount < 100) // Safety limit
+                {
+                    DWORD_PTR callbackPtr = (DWORD_PTR)lpCallbackArray[callbackCount];
+
+                    if (callbackPtr == 0)
+                    {
+                        printf("[+] Found NULL terminator at callback #%d\n", callbackCount);
+                        break; // NULL terminator
+                    }
+
+                    printf("[+] TLS callback #%d pointer: 0x%llx\n", callbackCount, callbackPtr);
+
+                    PIMAGE_TLS_CALLBACK lpImageCallback;
+
+                    // Check if callback pointer has been relocated
+                    if (callbackPtr >= currentImageBase && callbackPtr < imageEnd)
+                    {
+                        // Already relocated
+                        lpImageCallback = (PIMAGE_TLS_CALLBACK)callbackPtr;
+                        printf("[+]   -> Already relocated, using: 0x%p\n", (LPVOID)lpImageCallback);
+                    }
+                    else if (callbackPtr >= originalImageBase &&
+                        callbackPtr < (originalImageBase + lpImageNTHeaderFile->OptionalHeader.SizeOfImage))
+                    {
+                        // Needs relocation
+                        lpImageCallback = (PIMAGE_TLS_CALLBACK)(callbackPtr + delta);
+                        printf("[+]   -> Relocating: 0x%llx -> 0x%p\n", callbackPtr, (LPVOID)lpImageCallback);
+                    }
+                    else
+                    {
+                        printf("[-]   -> Invalid callback address (outside both ranges)\n");
+                        break;
+                    }
+
+                    // Final validation
+                    if ((DWORD_PTR)lpImageCallback < currentImageBase ||
+                        (DWORD_PTR)lpImageCallback >= imageEnd)
+                    {
+                        printf("[-] Callback #%d (0x%p) outside image bounds (0x%llx - 0x%llx)!\n",
+                            callbackCount, (LPVOID)lpImageCallback, currentImageBase, imageEnd);
+                        break;
+                    }
+
+                    // Execute callback
+                    __try
+                    {
+                        printf("[+] Executing TLS callback #%d at 0x%p...\n",
+                            callbackCount, (LPVOID)lpImageCallback);
+                        lpImageCallback((HINSTANCE)lpAllocAddress, DLL_PROCESS_ATTACH, nullptr);
+                        printf("[+]   -> SUCCESS\n");
+                    }
+                    __except (EXCEPTION_EXECUTE_HANDLER)
+                    {
+                        DWORD exceptionCode = GetExceptionCode();
+                        printf("[-] TLS callback #%d CRASHED! Exception: 0x%x\n",
+                            callbackCount, exceptionCode);
+
+                        if (exceptionCode == 0xC0000005)
+                            printf("[-]   Access Violation - callback tried to access invalid memory\n");
+
+                        return nullptr;
+                    }
+
+                    callbackCount++;
+                }
+
+                if (callbackCount > 0)
+                {
+                    printf("[+] Executed %d TLS callback(s).\n", callbackCount);
+                }
+            }
+        }
+    }
+
+    // Call entry point
+    const BOOL bIsDLL = (lpImageNTHeader->FileHeader.Characteristics & IMAGE_FILE_DLL) != 0;
+
+    if (bIsDLL)
+    {
+        const auto main = (dllmain)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
+        const BOOL result = main((HINSTANCE)lpAllocAddress, DLL_PROCESS_ATTACH, nullptr);
+        if (!result)
+        {
+            printf("[-] DllMain returned FALSE!\n");
+            return nullptr;
+        }
+        printf("[+] DllMain called (DLL_PROCESS_ATTACH).\n");
+        printf("[+] DLL loaded successfully.\n");
+    }
+    else
+    {
+        printf("[+] EXE loaded successfully (entry point NOT executed).\n");
+        printf("[!] Entry point: 0x%p\n",
+            (LPVOID)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint));
+    }
+
+    HeapFree(GetProcessHeap(), 0, hPEData);
+    return (LPVOID)lpAllocAddress;
 }
