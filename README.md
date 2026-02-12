@@ -1,7 +1,12 @@
 # Manual PE Loader
 
-This project is a modern PE Loader designed for x64 PE (exe or dll) only. It is currently written in C++ with classic Windows API. 
-Later, this project will be converted in C to use native function only.
+This project is a modern PE Loader designed for x64 PE (exe or dll) only. 
+
+* Modern Manual Loader is written in C++ and contains classic Windows API.
+* Native Manual Loader is written in pure C and contains Nt* procedures with debugging.
+* Native Manual Loader GCC is written in pure C and no dependencies. It is used to output shellcode. (Supports debugging)
+
+Evasion & obfuscation will be added later.
 
 ## Supports
 
