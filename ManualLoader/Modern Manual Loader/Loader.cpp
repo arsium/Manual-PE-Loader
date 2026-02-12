@@ -209,7 +209,7 @@ BOOL MemoryLoader::ProcessLoadConfig(const LPVOID lpImage)
     if (ImageDataLoadConfig.VirtualAddress == 0 || ImageDataLoadConfig.Size == 0)
     {
         printf("[+] No Load Config directory found.\n");
-        return TRUE;
+        return FALSE;
     }
 
     printf("[+] Processing Load Config directory...\n");

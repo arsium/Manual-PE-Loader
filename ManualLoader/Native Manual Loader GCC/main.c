@@ -1,6 +1,52 @@
-#include "Loader.h"
+#include "HostileHeader.h"
 
-unsigned char DelayLoad[14848] = {
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#pragma clang diagnostic ignored "-Wunused-value"
+#pragma ide diagnostic ignored "ConstantParameter"
+
+#define DEBUG_CONST
+
+#define CLASSIC										0x00000000
+#define USE_NT_CREATE_SECTION_FOR_ALLOCATION		0x00000001  // Bit 0
+#define CALL_ENTRY_POINT							0x00000002  // Bit 1
+#define THREADED_ENTRY_POINT						0x00000004  // Bit 2
+#define LINK_TO_PEB_LDR								0x00000008  // Bit 3
+
+#define UNUSED_FLAG_2								0x00000010  // Bit 4
+#define UNUSED_FLAG_3								0x00000020  // Bit 5
+#define UNUSED_FLAG_4								0x00000040  // Bit 6
+#define UNUSED_FLAG_5								0x00000080  // Bit 7
+#define UNUSED_FLAG_6								0x00000100  // Bit 8
+#define UNUSED_FLAG_7								0x00000200  // Bit 9
+#define UNUSED_FLAG_8								0x00000400  // Bit 10
+#define UNUSED_FLAG_9								0x00000800  // Bit 11
+#define UNUSED_FLAG_10								0x00001000  // Bit 12
+#define UNUSED_FLAG_11								0x00002000  // Bit 13
+#define UNUSED_FLAG_12								0x00004000  // Bit 14
+#define UNUSED_FLAG_13								0x00008000  // Bit 15
+#define UNUSED_FLAG_14								0x00010000  // Bit 16
+#define UNUSED_FLAG_15								0x00020000  // Bit 17
+#define UNUSED_FLAG_16								0x00040000  // Bit 18
+#define UNUSED_FLAG_17								0x00080000  // Bit 19
+#define UNUSED_FLAG_18								0x00100000  // Bit 20
+#define UNUSED_FLAG_19								0x00200000  // Bit 21
+#define UNUSED_FLAG_20								0x00400000  // Bit 22
+#define UNUSED_FLAG_21								0x00800000  // Bit 23
+#define UNUSED_FLAG_22								0x01000000  // Bit 24
+#define UNUSED_FLAG_23								0x02000000  // Bit 25
+#define UNUSED_FLAG_24								0x04000000  // Bit 26
+#define UNUSED_FLAG_25                              0x08000000  // Bit 27
+#define UNUSED_FLAG_26								0x10000000  // Bit 28
+#define UNUSED_FLAG_27								0x20000000  // Bit 29
+#define UNUSED_FLAG_28								0x40000000  // Bit 30
+#define UNUSED_FLAG_29								0x80000000  // Bit 31
+
+
+__attribute__((section(".text")))
+
+#ifdef DEBUG_CONST
+unsigned char DelayLoad[14848] =
+{
 	0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
 	0xFF, 0xFF, 0x00, 0x00, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -2437,15 +2483,1717 @@ unsigned char DelayLoadExe[14336] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+#endif
 
-int main(void)
+LPVOID       GetProcAddressByOrdinal(LPVOID hModule, WORD ordinal);			//recursive
+LPVOID       GetProcAddressByName(LPVOID hModule, LPSTR lpFunctionName);	//recursive
+
+#define RtlZeroMemory(Destination,Length) Manual_memset((Destination),0,(Length))
+#define INVALID_HANDLE_VALUE ((HANDLE)(LONG_PTR)-1)
+
+#define MAX_PATH					260
+#define CP_ACP						0           // default to ANSI code page
+#define CP_OEMCP					1           // default to OEM  code page
+#define CP_MACCP					2           // default to MAC  code page
+#define CP_THREAD_ACP				3           // current thread's ANSI code page
+#define CP_SYMBOL					42          // SYMBOL translations
+
+#define CP_UTF7						65000       // UTF-7 translation
+#define CP_UTF8						65001       // UTF-8 translation
+#define DLL_PROCESS_DETACH			0
+#define DLL_PROCESS_ATTACH			1
+#define DLL_THREAD_ATTACH			2
+#define DLL_THREAD_DETACH			3
+
+#define SECTION_QUERY				0x0001
+#define SECTION_MAP_WRITE			0x0002
+#define SECTION_MAP_READ			0x0004
+#define SECTION_MAP_EXECUTE			0x0008
+#define SECTION_EXTEND_SIZE			0x0010
+#define SECTION_READ_EXEC_WRITE (SECTION_MAP_EXECUTE | SECTION_MAP_READ | SECTION_MAP_WRITE)
+#define SECTION_ALL_ACCESS (STANDARD_RIGHTS_REQUIRED|SECTION_QUERY|\
+SECTION_MAP_WRITE |      \
+SECTION_MAP_READ |       \
+SECTION_MAP_EXECUTE |    \
+SECTION_EXTEND_SIZE)
+
+typedef BOOL(*dllmain)(LPVOID dll, DWORD reason, LPVOID reserved);
+typedef int (*EXEENTRYPOINT)(VOID);
+
+typedef enum _SECTION_INHERIT
 {
-	LPVOID lpModule = LoadPE(DelayLoadExe);
+	ViewShare = 1,
+	ViewUnmap = 2
+} SECTION_INHERIT;
+
+typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY
+{
+	DWORD BeginAddress;
+	DWORD EndAddress;
+	union {
+		DWORD UnwindInfoAddress;
+		DWORD UnwindData;
+	} DUMMYUNIONNAME;
+} _IMAGE_RUNTIME_FUNCTION_ENTRY, *_PIMAGE_RUNTIME_FUNCTION_ENTRY;
+
+typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+
+typedef
+BOOLEAN
+RtlAddFunctionTable(
+	_In_reads_(EntryCount) PRUNTIME_FUNCTION FunctionTable,
+	_In_ ULONG EntryCount,
+	_In_ ULONG64 BaseAddress
+	);typedef RtlAddFunctionTable* PRtlAddFunctionTable;
+
+typedef
+BOOLEAN
+RtlDeleteFunctionTable(
+	_In_ PRUNTIME_FUNCTION FunctionTable
+	);typedef RtlDeleteFunctionTable* PRtlDeleteFunctionTable;
+
+typedef
+NTSTATUS
+NtCreateSection(
+	_Out_ PHANDLE SectionHandle,
+	_In_ ACCESS_MASK DesiredAccess,
+	_In_opt_ POBJECT_ATTRIBUTES ObjectAttributes,
+	_In_opt_ PLARGE_INTEGER MaximumSize,
+	_In_ ULONG SectionPageProtection,
+	_In_ ULONG AllocationAttributes,
+	_In_opt_ HANDLE FileHandle
+	);typedef NtCreateSection*PNtCreateSection;
+
+typedef
+NTSTATUS
+NtMapViewOfSection(
+	_In_ HANDLE SectionHandle,
+	_In_ HANDLE ProcessHandle,
+	_Inout_ PVOID *BaseAddress,
+	_In_ ULONG_PTR ZeroBits,
+	_In_ SIZE_T CommitSize,
+	PLARGE_INTEGER SectionOffset,
+	_Inout_ PSIZE_T ViewSize,
+	_In_ SECTION_INHERIT InheritDisposition,
+	_In_ ULONG AllocationType,
+	_In_ ULONG PageProtection
+	);typedef NtMapViewOfSection*PNtMapViewOfSection;
+
+FORCE_INLINE void* Manual_memset(void* dest, int value, size_t count)
+{
+	unsigned char* ptr = (unsigned char*)dest;
+	unsigned char byteValue = (unsigned char)value;
+
+	if (dest == NULL)
+		return NULL;
+
+	/* Simple byte-by-byte fill */
+	for (size_t i = 0; i < count; i++)
+	{
+		ptr[i] = byteValue;
+	}
+	return dest;
+}
+
+FORCE_INLINE PVOID memcpy(PVOID dest,  PVOID src, SIZE_T n)
+{
+    CHAR* d = (CHAR*)dest;
+	CHAR* s = ( CHAR*)src;
+
+    for (SIZE_T i = 0; i < n; i++)
+    {
+        d[i] = s[i];
+    }
+
+    return dest;
+}
+
+/**
+ * Manual implementation of wcslen
+ * Gets the length of a wide character string
+ *
+ * @param str - Wide character string
+ * @return Length in WCHARs (excluding null terminator)
+ */
+size_t Manual_wcslen(const WCHAR* str)
+{
+	size_t len = 0;
+
+	if (str == NULL)
+		return 0;
+
+	while (str[len] != L'\0')
+		len++;
+
+	return len;
+}
+
+/**
+ * Manual implementation of wcscpy
+ * Copies a wide character string
+ *
+ * @param dest - Destination buffer
+ * @param src - Source string
+ * @return Pointer to dest
+ */
+WCHAR* Manual_wcscpy(WCHAR* dest, const WCHAR* src)
+{
+	WCHAR* original = dest;
+
+	if (dest == NULL || src == NULL)
+		return dest;
+
+	while (*src != L'\0')
+	{
+		*dest++ = *src++;
+	}
+
+	*dest = L'\0';  /* Null terminate */
+
+	return original;
+}
+
+/**
+ * Manual implementation of MultiByteToWideChar
+ * Converts multibyte character string to wide character string
+ *
+ * @param CodePage - Code page to use (CP_ACP, CP_UTF8, etc.)
+ * @param dwFlags - Conversion flags
+ * @param lpMultiByteStr - Source multibyte string
+ * @param cbMultiByte - Length of source string (-1 for null-terminated)
+ * @param lpWideCharStr - Destination wide char buffer (NULL to get required size)
+ * @param cchWideChar - Size of destination buffer in WCHARs
+ * @return Number of WCHARs written, or required size if lpWideCharStr is NULL
+ */
+FORCE_INLINE int Manual_MultiByteToWideChar(UINT CodePage,DWORD dwFlags,LPCSTR lpMultiByteStr,int cbMultiByte,LPWSTR lpWideCharStr, int cchWideChar)
+{
+    int sourceLen;
+
+    /* Validate input */
+    if (lpMultiByteStr == NULL)
+        return 0;
+
+    /* Calculate source length if not provided */
+    if (cbMultiByte == -1)
+    {
+        sourceLen = 0;
+        while (lpMultiByteStr[sourceLen] != '\0')
+            sourceLen++;
+        sourceLen++; /* Include null terminator */
+    }
+    else
+    {
+        sourceLen = cbMultiByte;
+    }
+
+    /* If only querying size, return required buffer size */
+    if (lpWideCharStr == NULL || cchWideChar == 0)
+    {
+        return sourceLen; /* For ASCII/ANSI, 1 byte = 1 wchar */
+    }
+
+    /* Simple ASCII/ANSI conversion (most common case) */
+    if (CodePage == CP_ACP)
+    {
+        int requiredSize = sourceLen;
+
+        /* Check if buffer is large enough */
+        if (cchWideChar < requiredSize)
+            return 0; /* Buffer too small */
+
+        /* Convert byte by byte */
+        for (int i = 0; i < sourceLen; i++)
+        {
+            lpWideCharStr[i] = (WCHAR)(unsigned char)lpMultiByteStr[i];
+        }
+
+        return sourceLen;
+    }
+	return 0;
+}
+
+/**
+ * Manual implementation of strchr
+ * Finds the first occurrence of a character in a string
+ *
+ * @param str - String to search in
+ * @param c - Character to find
+ * @return Pointer to first occurrence, or NULL if not found
+ */
+FORCE_INLINE char* Manual_strchr(const char* str, int c)
+{
+    if (str == NULL)
+        return nullptr;
+
+    while (*str != '\0')
+    {
+        if (*str == (char)c)
+            return (char*)str;
+        str++;
+    }
+
+    /* Check if looking for null terminator */
+    if ((char)c == '\0')
+        return (char*)str;
+
+    return nullptr;
+}
+
+/**
+ * Manual implementation of strncpy_s
+ * Safely copies up to n characters from source to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string
+ * @param count - Maximum number of characters to copy
+ * @return 0 on success, error code on failure
+ */
+FORCE_INLINE int Manual_strncpy_s(char* dest, size_t destSize, const char* src, size_t count)
+{
+    size_t i;
+
+    /* Validate parameters */
+    if (dest == NULL)
+        return 22; /* EINVAL */
+
+    if (src == NULL)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Determine how many characters to actually copy */
+    size_t copyCount = count;
+    if (count == (size_t)-1 || count >= destSize)
+    {
+        copyCount = destSize - 1; /* Leave room for null terminator */
+    }
+
+    /* Copy characters */
+    for (i = 0; i < copyCount && src[i] != '\0'; i++)
+    {
+        dest[i] = src[i];
+    }
+
+    /* Null terminate */
+    if (i < destSize)
+        dest[i] = '\0';
+    else
+        dest[destSize - 1] = '\0';
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of strcat_s
+ * Safely concatenates source string to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string to append
+ * @return 0 on success, error code on failure
+ */
+FORCE_INLINE int Manual_strcat_s(char* dest, size_t destSize, const char* src)
+{
+    /* Validate parameters */
+
+	if (destSize == 0)
+		return 22; /* EINVAL */
+
+    if (dest == nullptr)
+        return 22; /* EINVAL */
+
+    if (src == nullptr)
+        return 22; /* EINVAL */
+
+    /* Find end of destination string */
+    size_t destLen = 0;
+    while (destLen < destSize && dest[destLen] != '\0')
+        destLen++;
+
+    /* Check if destination is already full or not null-terminated */
+    if (destLen >= destSize)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Copy source to end of destination */
+    size_t i = 0;
+    while (src[i] != '\0' && (destLen + i + 1) < destSize)
+    {
+        dest[destLen + i] = src[i];
+        i++;
+    }
+
+    /* Null terminate */
+    dest[destLen + i] = '\0';
+
+    /* Check if we truncated */
+    if (src[i] != '\0')
+        return 34; /* ERANGE - buffer too small */
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of strcpy_s
+ * Safely copies source string to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string
+ * @return 0 on success, error code on failure
+ */
+FORCE_INLINE int Manual_strcpy_s(char* dest, size_t destSize, const char* src)
+{
+    size_t i;
+
+    /* Validate parameters */
+    if (dest == nullptr)
+        return 22; /* EINVAL */
+
+    if (src == NULL)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Copy characters */
+    for (i = 0; i < destSize - 1 && src[i] != '\0'; i++)
+    {
+        dest[i] = src[i];
+    }
+
+    /* Null terminate */
+    dest[i] = '\0';
+
+    /* Check if truncated */
+    if (i == destSize - 1 && src[i] != '\0')
+        return 34; /* ERANGE */
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of atoi
+ * Converts string to integer
+ *
+ * @param str - String to convert
+ * @return Integer value, or 0 if invalid
+ */
+FORCE_INLINE int Manual_atoi(const char* str)
+{
+    int result = 0;
+    int sign = 1;
+    int i = 0;
+
+    if (str == NULL)
+        return 0;
+
+    /* Skip leading whitespace */
+    while (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' ||
+           str[i] == '\r' || str[i] == '\v' || str[i] == '\f')
+    {
+        i++;
+    }
+
+    /* Handle sign */
+    if (str[i] == '-')
+    {
+        sign = -1;
+        i++;
+    }
+    else if (str[i] == '+')
+    {
+        i++;
+    }
+
+    /* Convert digits */
+    while (str[i] >= '0' && str[i] <= '9')
+    {
+        result = result * 10 + (str[i] - '0');
+        i++;
+    }
+
+    return result * sign;
+}
+
+/**
+ * Manual implementation of strcmp (bonus)
+ * Compares two strings
+ *
+ * @param str1 - First string
+ * @param str2 - Second string
+ * @return 0 if equal, <0 if str1<str2, >0 if str1>str2
+ */
+FORCE_INLINE int Manual_strcmp(const char* str1, const char* str2)
+{
+    if (str1 == NULL || str2 == NULL)
+        return (str1 == str2) ? 0 : (str1 == NULL ? -1 : 1);
+
+    while (*str1 != '\0' && *str2 != '\0')
+    {
+        if (*str1 != *str2)
+            return (unsigned char)*str1 - (unsigned char)*str2;
+        str1++;
+        str2++;
+    }
+
+    return (unsigned char)*str1 - (unsigned char)*str2;
+}
+
+/**
+ * Custom GetProcAddress for NTDLL procedures
+ * @param function_name : Name of the function to find
+ * @return : Function address if success, NULL otherwise
+ */
+FORCE_INLINE LPVOID GetProcedureAddressNt(char* function_name)
+{
+	WCHAR nt[] = { 'n','t','d','l','l','.','d','l','l','\0' };
+	DWORD_PTR module_address = (DWORD_PTR)GetModuleBaseAddress(nt);//L"ntdll.dll\0"
+	IMAGE_DOS_HEADER* dos_header = (IMAGE_DOS_HEADER*)module_address;
+	IMAGE_NT_HEADERS* nt_header = (IMAGE_NT_HEADERS*)(module_address + dos_header->e_lfanew);
+	IMAGE_OPTIONAL_HEADER* optional_header = &nt_header->OptionalHeader;
+	IMAGE_DATA_DIRECTORY* export_data_directory = (IMAGE_DATA_DIRECTORY*)(&optional_header->DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT]);
+	IMAGE_EXPORT_DIRECTORY* export_data_header = (IMAGE_EXPORT_DIRECTORY*)(module_address + export_data_directory->VirtualAddress);
+
+	DWORD* export_address_table = (DWORD*)(module_address + export_data_header->AddressOfFunctions);
+	DWORD* function_name_table = (DWORD*)(module_address + export_data_header->AddressOfNames);
+	WORD* ordinal_name_table = (WORD*)(module_address + export_data_header->AddressOfNameOrdinals);
+
+	if (((DWORD_PTR)function_name >> 16) == 0)
+	{
+		WORD ordinal = (WORD)((ULONG_PTR)function_name & 0xFFFF);
+		//WORD ordinal = (WORD)function_name & 0xFFFF;
+		DWORD base = export_data_header->Base;
+
+		if (ordinal < base || ordinal >= base + export_data_header->NumberOfFunctions)
+			return NULL;
+
+		return (PVOID)(module_address + (DWORD_PTR)export_address_table[ordinal - base]);
+	}
+	else
+	{
+		for (DWORD i = 0; i < export_data_header->NumberOfNames; i++)
+		{
+			char* current_function_name = (char*)(module_address + (DWORD_PTR)function_name_table[i]);
+
+			if (CompareAnsi(function_name, current_function_name) == TRUE)
+			{
+				return (LPVOID)(module_address + (DWORD_PTR)export_address_table[ordinal_name_table[i]]);
+			}
+		}
+	}
+	return NULL;
+}
+
+/**
+ * Custom GetProcAddress - Works on both system and manually-loaded modules
+ * @param hModule : Module handle (from LoadLibrary or your LoadDLL)
+ * @param lpFunctionName : Name of the function to find
+ * @return : Function address if success, NULL otherwise
+ */
+LPVOID GetProcAddressByName(PVOID hModule, LPSTR lpFunctionName)
+{
+    if (hModule == NULL || lpFunctionName == NULL)
+        return NULL;
+
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)hModule;
+
+    // Validate DOS header
+    if (lpImageDOSHeader->e_magic != IMAGE_DOS_SIGNATURE)
+        return NULL;
+
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)hModule + lpImageDOSHeader->e_lfanew);
+
+    // Validate NT header
+    if (lpImageNTHeader->Signature != IMAGE_NT_SIGNATURE)
+        return NULL;
+
+    // Check if export directory exists
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return NULL;
+
+    PIMAGE_EXPORT_DIRECTORY lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(
+        (DWORD_PTR)hModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress
+        );
+
+    // Get export tables
+    const DWORD* lpAddressOfFunctions = (DWORD*)((DWORD_PTR)hModule + lpImageExportDirectory->AddressOfFunctions);
+    const DWORD* lpAddressOfNames = (DWORD*)((DWORD_PTR)hModule + lpImageExportDirectory->AddressOfNames);
+    const WORD* lpAddressOfNameOrdinals = (WORD*)((DWORD_PTR)hModule + lpImageExportDirectory->AddressOfNameOrdinals);
+
+    // Get export directory bounds for forwarded export detection
+    const DWORD_PTR dwExportDirStart = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    const DWORD_PTR dwExportDirEnd = dwExportDirStart + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+    // Search for function by name
+    for (DWORD i = 0; i < lpImageExportDirectory->NumberOfNames; i++)
+    {
+        const char* lpCurrentFunctionName = (const char*)((DWORD_PTR)hModule + lpAddressOfNames[i]);
+
+        if (Manual_strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+        {
+            // Found the function - get its ordinal
+            const WORD ordinal = lpAddressOfNameOrdinals[i];
+            const DWORD functionRVA = lpAddressOfFunctions[ordinal];
+
+            // Check if this is a forwarded export (PE spec section 6.3.2)
+            if (functionRVA >= dwExportDirStart && functionRVA < dwExportDirEnd)
+            {
+                // This is a forwarded export (e.g., "NTDLL.RtlAllocateHeap")
+                char* lpForwardString = (char*)((DWORD_PTR)hModule + functionRVA);
+
+                // Parse forward string (format: "DllName.FunctionName" or "DllName.#Ordinal")
+                char szForwardDll[256] = { 0 };
+                char szForwardFunction[256] = { 0 };
+
+                char* lpDot = Manual_strchr(lpForwardString, '.');
+                if (lpDot != NULL)
+                {
+                    size_t dllNameLen = lpDot - lpForwardString;
+                    Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+                    Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+                    Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+
+                    // Load the forwarded DLL
+                    //HMODULE hForwardModule = LoadLibraryA(szForwardDll);
+
+                    PVOID hForwardModule = NULL;
+                    //NTSTATUS status;
+                    UNICODE_STRING uModuleName;
+                    WCHAR wLibraryName[MAX_PATH];
+
+                    // Convert ANSI library name to wide char
+                    Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+
+                    // Initialize UNICODE_STRING with the library name
+                    RtlInitUnicodeStringInline(&uModuleName, wLibraryName);
+
+                	PLdrLoadDll ldr_load_dll = GetProcedureAddressNt("LdrLoadDll\0");
+                    // Load the DLL using LdrLoadDll
+                    (void)ldr_load_dll(
+                        nullptr,           // PathToFile (NULL = use default search path)
+                        nullptr,              // Flags (0 = default behavior)
+                        &uModuleName,   // ModuleFileName as UNICODE_STRING
+                        (PHANDLE)&hForwardModule  // Output handle to the loaded module
+                    );
+
+                    if (hForwardModule != NULL)
+                    {
+                        // Check if forwarding to ordinal (starts with '#')
+                        if (szForwardFunction[0] == '#')
+                        {
+                            WORD forwardOrdinal = (WORD)Manual_atoi(szForwardFunction + 1);
+                            return GetProcAddressByOrdinal(hForwardModule, forwardOrdinal);
+                        }
+                        else
+                        {
+                            // Recursive call to handle forwarding chains
+                            return GetProcAddressByName(hForwardModule, szForwardFunction);
+                        }
+                    }
+                }
+
+                return NULL;  // Failed to resolve forward
+            }
+
+            // Normal export - return function address
+            return (LPVOID)((DWORD_PTR)hModule + functionRVA);
+        }
+    }
+
+    return NULL;  // Function not found
+}
+
+/**
+ * Custom GetProcAddress by ordinal - Works on both system and manually-loaded modules
+ * @param hModule : Module handle (from LoadLibrary or your LoadDLL)
+ * @param ordinal : Ordinal of the function to find
+ * @return : Function address if success, NULL otherwise
+ */
+LPVOID GetProcAddressByOrdinal(PVOID hModule, WORD ordinal)
+{
+    if (hModule == NULL)
+        return NULL;
+
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)hModule;
+
+    // Validate DOS header
+    if (lpImageDOSHeader->e_magic != IMAGE_DOS_SIGNATURE)
+        return NULL;
+
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)hModule + lpImageDOSHeader->e_lfanew);
+
+    // Validate NT header
+    if (lpImageNTHeader->Signature != IMAGE_NT_SIGNATURE)
+        return NULL;
+
+    // Check if export directory exists
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return NULL;
+
+    PIMAGE_EXPORT_DIRECTORY lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)(
+        (DWORD_PTR)hModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress
+        );
+
+    // Calculate actual ordinal index (ordinal - base)
+    const DWORD ordinalIndex = ordinal - lpImageExportDirectory->Base;
+
+    // Validate ordinal is in range
+    if (ordinalIndex >= lpImageExportDirectory->NumberOfFunctions)
+        return NULL;
+
+    // Get function RVA from AddressOfFunctions table
+    const DWORD* lpAddressOfFunctions = (DWORD*)((DWORD_PTR)hModule + lpImageExportDirectory->AddressOfFunctions);
+    const DWORD functionRVA = lpAddressOfFunctions[ordinalIndex];
+
+    if (functionRVA == 0)
+        return NULL;  // Ordinal slot is empty
+
+    // Get export directory bounds for forwarded export detection
+    const DWORD_PTR dwExportDirStart = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    const DWORD_PTR dwExportDirEnd = dwExportDirStart + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+    // Check if this is a forwarded export
+    if (functionRVA >= dwExportDirStart && functionRVA < dwExportDirEnd)
+    {
+        // Forwarded export - resolve it
+        char* lpForwardString = (char*)((DWORD_PTR)hModule + functionRVA);
+
+        char szForwardDll[256] = { 0 };
+        char szForwardFunction[256] = { 0 };
+
+        char* lpDot = Manual_strchr(lpForwardString, '.');
+        if (lpDot != NULL)
+        {
+            size_t dllNameLen = lpDot - lpForwardString;
+            Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+            Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+            Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+
+            //HMODULE hForwardModule = LoadLibraryA(szForwardDll);
+
+            PVOID hForwardModule = NULL;
+            //NTSTATUS status;
+            UNICODE_STRING uModuleName;
+            WCHAR wLibraryName[MAX_PATH];
+
+            // Convert ANSI library name to wide char
+            Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+
+            // Initialize UNICODE_STRING with the library name
+            RtlInitUnicodeStringInline(&uModuleName, wLibraryName);
+
+        	PLdrLoadDll ldr_load_dll = GetProcedureAddressNt("LdrLoadDll\0");
+            // Load the DLL using LdrLoadDll
+            (void)ldr_load_dll(
+                nullptr,           // PathToFile (NULL = use default search path)
+                nullptr,              // Flags (0 = default behavior)
+                &uModuleName,   // ModuleFileName as UNICODE_STRING
+                (PHANDLE)&hForwardModule  // Output handle to the loaded module
+            );
+
+            if (hForwardModule != NULL)
+            {
+                if (szForwardFunction[0] == '#')
+                {
+                    WORD forwardOrdinal = (WORD)Manual_atoi(szForwardFunction + 1);
+                    return GetProcAddressByOrdinal(hForwardModule, forwardOrdinal);
+                }
+                else
+                {
+                    return GetProcAddressByName(hForwardModule, szForwardFunction);
+                }
+            }
+        }
+
+        return NULL;
+    }
+
+    // Normal export - return function address
+    return (LPVOID)((DWORD_PTR)hModule + functionRVA);
+}
+
+/**
+ * Enhanced GetFunctionAddress with forwarded exports support
+ * @param lpModule : address of the DLL
+ * @param lpFunctionName : name of the function
+ * @return : address of the function if success else NULL
+ */
+FORCE_INLINE LPVOID GetFunctionAddressEx(LPVOID lpModule, LPSTR lpFunctionName)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return NULL;
+
+    PIMAGE_EXPORT_DIRECTORY lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    const DWORD_PTR dNumberOfNames = lpImageExportDirectory->NumberOfNames;
+
+    // Get export directory bounds for forwarded export detection
+    const DWORD_PTR dwExportDirStart = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+    const DWORD_PTR dwExportDirEnd = dwExportDirStart + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+
+    for (int i = 0; i < (int)dNumberOfNames; i++)
+    {
+        LPSTR lpCurrentFunctionName = (LPSTR)(((DWORD*)(lpImageExportDirectory->AddressOfNames + (DWORD_PTR)lpModule))[i] + (DWORD_PTR)lpModule);
+        WORD lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
+        DWORD addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
+
+        if (CompareAnsi(lpCurrentFunctionName, lpFunctionName) == 0)
+        {
+            // Check if this is a forwarded export
+            if (addRVA >= dwExportDirStart && addRVA < dwExportDirEnd)
+            {
+                // This is a forwarded export (e.g., "NTDLL.RtlAllocateHeap")
+                char* lpForwardString = (char*)((DWORD_PTR)lpModule + addRVA);
+
+                // Parse forward string (format: "DllName.FunctionName" or "DllName.#Ordinal")
+                char szForwardDll[256] = { 0 };
+                char szForwardFunction[256] = { 0 };
+
+                char* lpDot = Manual_strchr(lpForwardString, '.');
+                if (lpDot != NULL)
+                {
+                    size_t dllNameLen = lpDot - lpForwardString;
+                    Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+                    Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+                    Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+
+                    // Load the forwarded DLL
+                	PVOID hForwardModule = NULL;
+                	//NTSTATUS status;
+                	UNICODE_STRING uModuleName;
+                	WCHAR wLibraryName[MAX_PATH];
+
+                	// Convert ANSI library name to wide char
+                	Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+
+                	// Initialize UNICODE_STRING with the library name
+                	RtlInitUnicodeStringInline(&uModuleName, wLibraryName);
+
+                	PLdrLoadDll ldr_load_dll = GetProcedureAddressNt("LdrLoadDll\0");
+                	// Load the DLL using LdrLoadDll
+                	(void)ldr_load_dll(
+						nullptr,           // PathToFile (NULL = use default search path)
+						nullptr,              // Flags (0 = default behavior)
+						&uModuleName,   // ModuleFileName as UNICODE_STRING
+						(PHANDLE)&hForwardModule  // Output handle to the loaded module
+					);
+
+                    if (hForwardModule != NULL)
+                    {
+                        // Check if forwarding to ordinal (starts with '#')
+                        if (szForwardFunction[0] == '#')
+                        {
+                            WORD ordinal = (WORD)Manual_atoi(szForwardFunction + 1);
+                            return (LPVOID)GetProcAddressByOrdinal(hForwardModule, ordinal);
+                        }
+                        else
+                        {
+                            return (LPVOID)GetProcAddressByName(hForwardModule, szForwardFunction);
+                        }
+                    }
+                }
+                return NULL;
+            }
+            // Normal export
+            return (LPVOID)((DWORD_PTR)lpModule + addRVA);
+        }
+    }
+    return NULL;
+}
+
+/**
+ *	Function to find function in the DLL.
+ *	\param lpModule : address of the DLL.
+ *	\param lpFunctionName : name of the function.
+ *	\return : address of the function if success else NULL.
+ */
+FORCE_INLINE LPVOID GetFunctionAddress(LPVOID lpModule, LPSTR lpFunctionName)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return NULL;
+
+    PIMAGE_EXPORT_DIRECTORY lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    const DWORD_PTR dNumberOfNames = lpImageExportDirectory->NumberOfNames;
+
+    for (int i = 0; i < (int)dNumberOfNames; i++)
+    {
+        LPSTR lpCurrentFunctionName = (LPSTR)(((DWORD*)(lpImageExportDirectory->AddressOfNames + (DWORD_PTR)lpModule))[i] + (DWORD_PTR)lpModule);
+        WORD lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
+        DWORD addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
+        if (Manual_strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+            return (LPVOID)((DWORD_PTR)lpModule + addRVA);
+    }
+
+    return NULL;
+}
+
+/**
+ *	Function to retrieve function address by using ordinal.
+ *	\param lpModule : address of the DLL.
+ *	\param dOrdinal : ordinal of the function.
+ *	\return : the address of the function.
+ */
+FORCE_INLINE LPVOID GetFunctionAddressByOrdinal(LPVOID lpModule, DWORD_PTR dOrdinal)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpModule;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress == 0)
+        return NULL;
+
+    PIMAGE_EXPORT_DIRECTORY lpImageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD_PTR)lpModule + lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+    DWORD addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[dOrdinal];
+    return (LPVOID)((DWORD_PTR)lpModule + addRVA);
+}
+
+/**
+ *	Function to check if the image is a valid PE file.
+ *	\param lpImage : PE image data.
+ *	\return : TRUE if the image is a valid PE else no.
+ */
+FORCE_INLINE BOOL IsValidPE(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->Signature == IMAGE_NT_SIGNATURE)
+        return TRUE;
+
+    return FALSE;
+}
+
+/**
+ *	Function to check if the image has the same arch.
+ *	\param lpImage : PE image data.
+ *	\return : TRUE if the image has the arch else FALSE.
+ */
+FORCE_INLINE BOOL IsValidArch(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImageDOSHeader + lpImageDOSHeader->e_lfanew);
+    if (lpImageNTHeader->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR_MAGIC)
+        return TRUE;
+
+    return FALSE;
+}
+
+/**
+ *	Function to identify if the PE file contains TLS callback directory.
+ *	\param lpImage : PE image data.
+ *	\return : true if TLS callback directory is present, FALSE otherwise.
+ */
+FORCE_INLINE BOOL HasCallbacks(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+    const DWORD_PTR dVirtualAddress = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress;
+
+    return dVirtualAddress != 0;
+}
+
+/**
+ * Function to process delay-load imports
+ * @param lpImage : base address of the loaded PE image
+ * @return : TRUE if success, FALSE otherwise
+ */
+FORCE_INLINE BOOL ProcessDelayImports(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+
+    // Check if delay import directory exists
+    const IMAGE_DATA_DIRECTORY ImageDataDelayImport = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT];
+    if (ImageDataDelayImport.VirtualAddress == 0 || ImageDataDelayImport.Size == 0)
+    {
+        return TRUE;
+    }
+
+    PIMAGE_DELAYLOAD_DESCRIPTOR lpDelayImportDescriptor = (PIMAGE_DELAYLOAD_DESCRIPTOR)((DWORD_PTR)lpImage + ImageDataDelayImport.VirtualAddress);
+
+    // Iterate through delay import descriptors (terminated by null entry)
+    while (lpDelayImportDescriptor->DllNameRVA != 0)
+    {
+        LPSTR lpLibraryName = (LPSTR)((DWORD_PTR)lpImage + lpDelayImportDescriptor->DllNameRVA);
+
+        PVOID hModule = NULL;
+        //NTSTATUS status;
+        UNICODE_STRING uModuleName;
+        WCHAR wLibraryName[MAX_PATH];
+
+        // Convert ANSI library name to wide char
+
+        Manual_MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
+
+        // Initialize UNICODE_STRING with the library name
+        RtlInitUnicodeStringInline(&uModuleName, wLibraryName);
+
+    	PLdrLoadDll ldr_load_dll = GetProcedureAddressNt("LdrLoadDll\0");
+        // Load the DLL using LdrLoadDll
+        (void)ldr_load_dll(
+            nullptr,           // PathToFile (NULL = use default search path)
+            nullptr,              // Flags (0 = default behavior)
+            &uModuleName,   // ModuleFileName as UNICODE_STRING
+            (PHANDLE)&hModule  // Output handle to the loaded module
+        );
+        //const HMODULE hModule = LoadLibraryA(lpLibraryName);
+
+        if (hModule == NULL)
+        {
+            return FALSE;
+        }
+        // Process Import Name Table (INT) and Import Address Table (IAT)
+        PIMAGE_THUNK_DATA lpINT = (PIMAGE_THUNK_DATA)((DWORD_PTR)lpImage + lpDelayImportDescriptor->ImportNameTableRVA);
+        PIMAGE_THUNK_DATA lpIAT = (PIMAGE_THUNK_DATA)((DWORD_PTR)lpImage + lpDelayImportDescriptor->ImportAddressTableRVA);
+
+        // Resolve all delay-imported functions
+        while (lpINT->u1.AddressOfData != 0)
+        {
+            if (IMAGE_SNAP_BY_ORDINAL(lpINT->u1.Ordinal))
+            {
+                // Import by ordinal
+                UINT functionOrdinal = (UINT)IMAGE_ORDINAL(lpINT->u1.Ordinal);
+                lpIAT->u1.Function = (DWORD_PTR)GetProcAddressByOrdinal(hModule, functionOrdinal);
+            }
+            else
+            {
+                // Import by name
+                PIMAGE_IMPORT_BY_NAME lpData = (PIMAGE_IMPORT_BY_NAME)((DWORD_PTR)lpImage + lpINT->u1.AddressOfData);
+                DWORD_PTR functionAddress = (DWORD_PTR)GetProcAddressByName(hModule, lpData->Name);
+                lpIAT->u1.Function = functionAddress;
+            }
+
+            lpINT++;
+            lpIAT++;
+        }
+
+        lpDelayImportDescriptor++;
+    }
+    return TRUE;
+}
+
+/**
+ * Function to process Load Config Directory
+ * @param lpImage : base address of the loaded PE image
+ * @return : TRUE if success, FALSE otherwise
+ */
+FORCE_INLINE BOOL ProcessLoadConfig(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+
+    // Check if Load Config directory exists
+    const IMAGE_DATA_DIRECTORY ImageDataLoadConfig = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG];
+    if (ImageDataLoadConfig.VirtualAddress == 0 || ImageDataLoadConfig.Size == 0)
+    {
+        return FALSE;
+    }
+
+    PIMAGE_LOAD_CONFIG_DIRECTORY64 lpLoadConfig = (PIMAGE_LOAD_CONFIG_DIRECTORY64)((DWORD_PTR)lpImage + ImageDataLoadConfig.VirtualAddress);
+
+    // Validate Size field
+    if (lpLoadConfig->Size < sizeof(IMAGE_LOAD_CONFIG_DIRECTORY64))
+    {
+    }
+
+    // Log security features
+    if (lpLoadConfig->SecurityCookie != 0)
+    {
+    }
+
+    if (lpLoadConfig->SEHandlerTable != 0 && lpLoadConfig->SEHandlerCount > 0)
+    {
+    }
+
+    if (lpLoadConfig->GuardCFCheckFunctionPointer != 0)
+    {
+    }
+
+    if (lpLoadConfig->GuardFlags & 0x00000100)
+    {
+    }
+
+    return TRUE;
+}
+
+/**
+ * Function to register exception handlers for x64
+ * @param lpImage : base address of the loaded PE image
+ * @return : TRUE if success, FALSE otherwise
+ */
+FORCE_INLINE BOOL RegisterExceptionHandlers(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+
+    // x64: Register exception handlers using .pdata section
+    const IMAGE_DATA_DIRECTORY ImageDataException = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION];
+    if (ImageDataException.VirtualAddress == 0 || ImageDataException.Size == 0)
+    {
+        return TRUE;
+    }
+
+    PRUNTIME_FUNCTION lpRuntimeFunction = (PRUNTIME_FUNCTION)((DWORD_PTR)lpImage + ImageDataException.VirtualAddress);
+    const DWORD dwFunctionCount = ImageDataException.Size / sizeof(RUNTIME_FUNCTION);
+
+	PRtlAddFunctionTable rtl_add_function_table = GetProcedureAddressNt("RtlAddFunctionTable\0");
+    // Register the function table with Windows
+    const BOOLEAN bResult = rtl_add_function_table(
+        lpRuntimeFunction,
+        dwFunctionCount,
+        (DWORD64)lpImage
+    );
+
+    if (!bResult)
+    {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/**
+ * Function to apply proper memory protection to sections
+ * @param lpImage : base address of the loaded PE image
+ * @return : TRUE if success, FALSE otherwise
+ */
+FORCE_INLINE BOOL ApplySectionProtections(LPVOID lpImage)
+{
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpImage;
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpImage + lpImageDOSHeader->e_lfanew);
+    PIMAGE_SECTION_HEADER lpImageSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageNTHeader + 4 + sizeof(IMAGE_FILE_HEADER) + lpImageNTHeader->FileHeader.SizeOfOptionalHeader);
+	NTSTATUS status = 0;
+
+	PNtProtectVirtualMemory nt_protect_virtual_memory = GetProcedureAddressNt("NtProtectVirtualMemory\0");
+
+	DWORD dwOldProtection = 0;
+	PVOID baseAddress = lpImage;
+	SIZE_T regionSize = lpImageNTHeader->OptionalHeader.SizeOfHeaders;
+	ULONG oldProtection = 0;
+
+	status = nt_protect_virtual_memory(
+		NtCurrentProcess(),    // Process handle (use -1 or GetCurrentProcess() for current process)
+		&baseAddress,           // Pointer to base address (will be updated to page-aligned address)
+		&regionSize,            // Pointer to size (will be updated to page-aligned size)
+		PAGE_READONLY,           // New protection flags (same as VirtualProtect)
+		&oldProtection          // Pointer to receive old protection
+	);
+
+    for (int i = 0; i < lpImageNTHeader->FileHeader.NumberOfSections; i++)
+    {
+        PIMAGE_SECTION_HEADER lpCurrentSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageSectionHeader + (i * sizeof(IMAGE_SECTION_HEADER)));
+
+        DWORD dwProtection = PAGE_NOACCESS;
+        const DWORD dwCharacteristics = lpCurrentSectionHeader->Characteristics;
+
+        // Determine protection based on section characteristics
+        // IMAGE_SCN_MEM_EXECUTE = 0x20000000
+        // IMAGE_SCN_MEM_READ    = 0x40000000
+        // IMAGE_SCN_MEM_WRITE   = 0x80000000
+
+        if (dwCharacteristics & IMAGE_SCN_MEM_EXECUTE)
+        {
+            if (dwCharacteristics & IMAGE_SCN_MEM_WRITE)
+                dwProtection = PAGE_EXECUTE_READWRITE;
+            else if (dwCharacteristics & IMAGE_SCN_MEM_READ)
+                dwProtection = PAGE_EXECUTE_READ;
+            else
+                dwProtection = PAGE_EXECUTE;
+        }
+        else
+        {
+            if (dwCharacteristics & IMAGE_SCN_MEM_WRITE)
+                dwProtection = PAGE_READWRITE;
+            else if (dwCharacteristics & IMAGE_SCN_MEM_READ)
+                dwProtection = PAGE_READONLY;
+            else
+                dwProtection = PAGE_NOACCESS;
+        }
+
+        LPVOID lpSectionAddress = (LPVOID)((DWORD_PTR)lpImage + lpCurrentSectionHeader->VirtualAddress);
+        SIZE_T stSectionSize = lpCurrentSectionHeader->Misc.VirtualSize;
+
+        if (stSectionSize == 0)
+            continue;
+
+    	dwOldProtection = 0;
+    	baseAddress = lpSectionAddress;
+    	regionSize = stSectionSize;
+    	oldProtection = 0;
+
+    	status = nt_protect_virtual_memory(
+			NtCurrentProcess(),    // Process handle (use -1 or GetCurrentProcess() for current process)
+			&baseAddress,           // Pointer to base address (will be updated to page-aligned address)
+			&regionSize,            // Pointer to size (will be updated to page-aligned size)
+			dwProtection,           // New protection flags (same as VirtualProtect)
+			&oldProtection          // Pointer to receive old protection
+		);
+
+    }
+    return status == 0 ? TRUE : FALSE;
+}
+
+
+/* Helper: allocate RWX image space backed by anonymous section */
+FORCE_INLINE LPVOID SectionAllocImageSpace(SIZE_T imageSize)
+{
+	PNtCreateSection nt_create_section = GetProcedureAddressNt("NtCreateSection\0");
+
+	HANDLE hSection = NULL;
+	LARGE_INTEGER maxSize;
+	SIZE_T viewSize;
+	PVOID baseAddress = NULL;
+
+	maxSize.QuadPart = (LONGLONG)imageSize;
+
+	/* Create anonymous committed section (no file) */
+	NTSTATUS status = nt_create_section(
+		&hSection,
+		SECTION_ALL_ACCESS,
+		nullptr,                   /* ObjectAttributes */
+		&maxSize,               /* MaximumSize */
+		PAGE_EXECUTE_READWRITE, /* Initial page protection */
+		SEC_COMMIT,             /* Committed, no file */
+		NULL                    /* FileHandle */
+	);
+
+	if (status != 0 || hSection == NULL)
+		return NULL;
+
+	viewSize = 0;  /* 0 = map whole section */
+
+	PNtMapViewOfSection nt_map_view_of_section = GetProcedureAddressNt("NtMapViewOfSection\0");
+	/* Map view into current process */
+	status = nt_map_view_of_section(
+		hSection,
+		NtCurrentProcess(),
+		&baseAddress,
+		0,                      /* ZeroBits */
+		0,                      /* CommitSize, 0 = default */
+		nullptr,                   /* SectionOffset */
+		&viewSize,              /* In/out: view size */
+		1,                      /* ViewShare */
+		0,                      /* AllocationType */
+		PAGE_EXECUTE_READWRITE  /* Win32Protect */
+	);
+
+
+	if (status != 0 || baseAddress == NULL)
+		return NULL;
+
+	return baseAddress; /* This is your lpAllocAddress equivalent */
+}
+
+/**
+ *	Function to load a PE in memory
+ *	\param lpPEData : Raw bytes of PE file.
+ *	\param flags : Flags specified for loader.
+ *	\return : PE address if success else NULL.
+ */
+LPVOID LoadPE(HANDLE lpPEData, ULONG flags)
+{
+    if (lpPEData == INVALID_HANDLE_VALUE || lpPEData == NULL)
+    {
+        return NULL;
+    }
+
+    if (!IsValidPE(lpPEData))
+    {
+        return NULL;
+    }
+
+    if (!IsValidArch(lpPEData))
+    {
+        return NULL;
+    }
+    // Parse file buffer headers
+    PIMAGE_DOS_HEADER lpImageDOSHeader = (PIMAGE_DOS_HEADER)lpPEData;
+    PIMAGE_NT_HEADERS lpImageNTHeaderFile = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpPEData + lpImageDOSHeader->e_lfanew);
+    PIMAGE_SECTION_HEADER lpImageSectionHeaderFile = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageNTHeaderFile + 4 + sizeof(IMAGE_FILE_HEADER) + lpImageNTHeaderFile->FileHeader.SizeOfOptionalHeader);
+
+    const DWORD_PTR dImageSize = lpImageNTHeaderFile->OptionalHeader.SizeOfImage;
+    const DWORD_PTR dOriginalImageBase = lpImageNTHeaderFile->OptionalHeader.ImageBase;
+
+	PVOID lpAllocAddress = NULL;  // NULL = let OS choose the address
+	SIZE_T regionSize = dImageSize;
+
+	if(!(flags & USE_NT_CREATE_SECTION_FOR_ALLOCATION))
+	{
+		PNtAllocateVirtualMemory nt_allocate_virtual_memory = GetProcedureAddressNt("NtAllocateVirtualMemory\0");
+		(void)nt_allocate_virtual_memory(
+			NtCurrentProcess(),
+			&lpAllocAddress,
+			0,
+			&regionSize,
+			MEM_COMMIT | MEM_RESERVE,
+			PAGE_READWRITE
+		);
+	}
+	else
+	{
+		lpAllocAddress = SectionAllocImageSpace(regionSize);
+	}
+    // Calculate delta for relocations
+    const DWORD_PTR dDeltaAddress = (DWORD_PTR)lpAllocAddress - dOriginalImageBase;
+
+    // Copy PE headers
+    memcpy(lpAllocAddress, lpPEData, lpImageNTHeaderFile->OptionalHeader.SizeOfHeaders);
+
+    // NOW we can safely access headers in lpAllocAddress
+    PIMAGE_NT_HEADERS lpImageNTHeader = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpAllocAddress + lpImageDOSHeader->e_lfanew);
+    lpImageNTHeader->OptionalHeader.ImageBase = (DWORD_PTR)lpAllocAddress;  // Update in loaded image
+
+    /* Copy sections */
+    for (int i = 0; i < lpImageNTHeaderFile->FileHeader.NumberOfSections; i++)
+    {
+        PIMAGE_SECTION_HEADER lpCurrentSectionHeader = (PIMAGE_SECTION_HEADER)((DWORD_PTR)lpImageSectionHeaderFile + (i * sizeof(IMAGE_SECTION_HEADER)));
+
+        LPVOID lpSectionDest = (LPVOID)((DWORD_PTR)lpAllocAddress + lpCurrentSectionHeader->VirtualAddress);
+        SIZE_T virtualSize = lpCurrentSectionHeader->Misc.VirtualSize;
+        SIZE_T rawSize = lpCurrentSectionHeader->SizeOfRawData;
+
+        /* Always zero-initialize the FULL virtual size first */
+        if (virtualSize > 0)
+        {
+            RtlZeroMemory(lpSectionDest, virtualSize);
+        }
+
+        /* Then copy raw data if it exists */
+        if (rawSize > 0 && lpCurrentSectionHeader->PointerToRawData > 0)
+        {
+            SIZE_T copySize = (rawSize < virtualSize) ? rawSize : virtualSize;
+            memcpy(
+                lpSectionDest,
+                (LPVOID)((DWORD_PTR)lpPEData + lpCurrentSectionHeader->PointerToRawData),
+                copySize
+            );
+        }
+    }
+
+    // Process relocations (using headers from lpAllocAddress now)
+    const IMAGE_DATA_DIRECTORY ImageDataReloc = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+    if (ImageDataReloc.VirtualAddress != 0 && ImageDataReloc.Size != 0 && dDeltaAddress != 0)
+    {
+        IMAGE_BASE_RELOCATION* pRelocTable = (IMAGE_BASE_RELOCATION*)((DWORD_PTR)lpAllocAddress + ImageDataReloc.VirtualAddress);
+
+        while (pRelocTable->VirtualAddress != 0)
+        {
+            if (pRelocTable->SizeOfBlock == 0)
+                break;
+
+            DWORD sizeOfTable = (pRelocTable->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / 2;
+            WORD* reloc = (WORD*)(pRelocTable + 1);
+
+            for (DWORD i = 0; i < sizeOfTable; ++i)
+            {
+                int type = reloc[i] >> 12;
+                int offset = reloc[i] & 0x0fff;
+
+                if (type == IMAGE_REL_BASED_DIR64)
+                {
+                    DWORD_PTR* addressToChange = (DWORD_PTR*)((DWORD_PTR)lpAllocAddress + pRelocTable->VirtualAddress + offset);
+                    *addressToChange += dDeltaAddress;
+                }
+            }
+
+            pRelocTable = (IMAGE_BASE_RELOCATION*)(((DWORD_PTR)pRelocTable) + pRelocTable->SizeOfBlock);
+        }
+    }
+
+    // Process imports
+    const IMAGE_DATA_DIRECTORY ImageDataImport = lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+
+    if (ImageDataImport.VirtualAddress != 0 && ImageDataImport.Size != 0)
+    {
+        PIMAGE_IMPORT_DESCRIPTOR lpImageImportDescriptor = (PIMAGE_IMPORT_DESCRIPTOR)((DWORD_PTR)lpAllocAddress + ImageDataImport.VirtualAddress);
+
+        while (lpImageImportDescriptor->Name != 0)
+        {
+            LPSTR lpLibraryName = (LPSTR)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->Name);
+            PVOID hModule = NULL;
+            //NTSTATUS status;
+            UNICODE_STRING uModuleName;
+            WCHAR wLibraryName[MAX_PATH];
+
+            // Convert ANSI library name to wide char
+            Manual_MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
+
+            // Initialize UNICODE_STRING with the library name
+            RtlInitUnicodeStringInline(&uModuleName, wLibraryName);
+
+        	PLdrLoadDll ldr_load_dll = GetProcedureAddressNt("LdrLoadDll\0");
+            // Load the DLL using LdrLoadDll
+            (void)ldr_load_dll(
+                nullptr,           // PathToFile (NULL = use default search path)
+                nullptr,              // Flags (0 = default behavior)
+                &uModuleName,   // ModuleFileName as UNICODE_STRING
+                &hModule  // Output handle to the loaded module
+            );
+
+            if (hModule == NULL)
+            {
+                return NULL;
+            }
+
+            PIMAGE_THUNK_DATA lpThunkData = (PIMAGE_THUNK_DATA)((DWORD_PTR)lpAllocAddress + lpImageImportDescriptor->FirstThunk);
+            while (lpThunkData->u1.AddressOfData != 0)
+            {
+                if (IMAGE_SNAP_BY_ORDINAL(lpThunkData->u1.Ordinal))
+                {
+                    UINT functionOrdinal = (UINT)IMAGE_ORDINAL(lpThunkData->u1.Ordinal);
+                    lpThunkData->u1.Function = (DWORD_PTR)GetProcAddressByOrdinal(hModule, functionOrdinal);
+                }
+                else
+                {
+                    PIMAGE_IMPORT_BY_NAME lpData = (PIMAGE_IMPORT_BY_NAME)((DWORD_PTR)lpAllocAddress + lpThunkData->u1.AddressOfData);
+                    DWORD_PTR functionAddress = (DWORD_PTR)GetProcAddressByName(hModule, lpData->Name);
+                    lpThunkData->u1.Function = functionAddress;
+                }
+                lpThunkData++;
+            }
+            lpImageImportDescriptor++;
+        }
+    }
+
+    // Process delay-load imports
+    if (!ProcessDelayImports(lpAllocAddress))
+    {
+        return NULL;
+    }
+
+    // Process Load Config directory
+    if (!ProcessLoadConfig(lpAllocAddress))
+    {
+        return NULL;
+    }
+
+    // Register exception handlers (critical for x64)
+    if (!RegisterExceptionHandlers(lpAllocAddress))
+    {
+        return NULL;
+    }
+
+	if (!ApplySectionProtections(lpAllocAddress))
+	{
+		return NULL;
+	}
+
+    /* ========== TLS CALLBACK HANDLING (x64 ONLY) ========== */
+    if (HasCallbacks(lpAllocAddress))
+    {
+        PIMAGE_TLS_DIRECTORY64 lpImageTLSDirectory = (PIMAGE_TLS_DIRECTORY64)((DWORD_PTR)lpAllocAddress +
+            lpImageNTHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS].VirtualAddress);
+
+        /* Get original ImageBase from file */
+        PIMAGE_DOS_HEADER lpImageDOSHeaderFile = (PIMAGE_DOS_HEADER)lpPEData;
+    	lpImageNTHeaderFile = (PIMAGE_NT_HEADERS)((DWORD_PTR)lpPEData + lpImageDOSHeaderFile->e_lfanew);
+        DWORD_PTR originalImageBase = lpImageNTHeaderFile->OptionalHeader.ImageBase;
+        DWORD_PTR currentImageBase = (DWORD_PTR)lpAllocAddress;
+        DWORD_PTR delta = currentImageBase - originalImageBase;
+        DWORD_PTR imageEnd = currentImageBase + lpImageNTHeader->OptionalHeader.SizeOfImage;
+        DWORD_PTR originalImageEnd = originalImageBase + lpImageNTHeaderFile->OptionalHeader.SizeOfImage;
+
+        /* Validate TLS directory is not all zeros */
+    	if (lpImageTLSDirectory->AddressOfCallBacks != 0)
+        {
+            PIMAGE_TLS_CALLBACK* lpCallbackArray = nullptr;
+            ULONGLONG callbacksAddr = lpImageTLSDirectory->AddressOfCallBacks;
+
+            /* Check if AddressOfCallBacks has already been relocated */
+            if (callbacksAddr >= currentImageBase && callbacksAddr < imageEnd)
+            {
+                /* Already relocated */
+                lpCallbackArray = (PIMAGE_TLS_CALLBACK*)callbacksAddr;
+            }
+            else if (callbacksAddr >= originalImageBase && callbacksAddr < originalImageEnd)
+            {
+                /* Not relocated yet */
+                lpCallbackArray = (PIMAGE_TLS_CALLBACK*)(callbacksAddr + delta);
+            }
+            else
+            {
+                lpCallbackArray = nullptr;
+            }
+
+            /* Validate callback array pointer */
+            if (lpCallbackArray == NULL ||
+                (DWORD_PTR)lpCallbackArray < currentImageBase ||
+                (DWORD_PTR)lpCallbackArray >= imageEnd)
+            {
+            }
+            else
+            {
+                int callbackCount = 0;
+                while (callbackCount < 100)
+                {
+                    ULONGLONG callbackPtr = (ULONGLONG)lpCallbackArray[callbackCount];
+                    PIMAGE_TLS_CALLBACK lpImageCallback;
+
+                    if (callbackPtr == 0)
+                    {
+                        break;
+                    }
+
+
+                    /* Check if callback needs relocation */
+                    if (callbackPtr >= currentImageBase && callbackPtr < imageEnd)
+                    {
+                        /* Already relocated */
+                        lpImageCallback = (PIMAGE_TLS_CALLBACK)callbackPtr;
+                    }
+                    else if (callbackPtr >= originalImageBase && callbackPtr < originalImageEnd)
+                    {
+                        /* Needs relocation */
+                        lpImageCallback = (PIMAGE_TLS_CALLBACK)(callbackPtr + delta);
+                    }
+                    else
+                    {
+                        break;
+                    }
+
+                    /* Validate final address */
+                    if ((DWORD_PTR)lpImageCallback < currentImageBase ||
+                        (DWORD_PTR)lpImageCallback >= imageEnd)
+                    {
+                        break;
+                    }
+
+                    /* Execute callback */
+                    lpImageCallback((PVOID)lpAllocAddress, DLL_PROCESS_ATTACH, NULL);
+                    callbackCount++;
+                }
+            }
+        }
+    }
+    // Call entry point
+    const BOOL bIsDLL = (lpImageNTHeader->FileHeader.Characteristics & IMAGE_FILE_DLL) != 0;
+
+    if (bIsDLL)
+    {
+        dllmain main = (dllmain)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
+        const BOOL result = main((PVOID)lpAllocAddress, DLL_PROCESS_ATTACH, NULL);
+        if (!result)
+        {
+            return NULL;
+        }
+    }
+    else
+    {
+    	if((flags & CALL_ENTRY_POINT))
+    	{
+    		if((flags & THREADED_ENTRY_POINT))
+    		{
+    			PNtCreateThreadEx nt_create_thread_ex = GetProcedureAddressNt("NtCreateThreadEx\0");
+    			PNtWaitForSingleObject nt_wait_for_single_object =  GetProcedureAddressNt("NtWaitForSingleObject\0");
+    			HANDLE threadHandle = nullptr;
+    			(void)nt_create_thread_ex(
+					&threadHandle,
+					THREAD_ALL_ACCESS,
+					nullptr,
+					NtCurrentProcess(),
+					(PUSER_THREAD_START_ROUTINE)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint),
+					nullptr,
+					0, 0, 0, 0,
+					nullptr
+				);
+    			(void)nt_wait_for_single_object(threadHandle, FALSE, nullptr);
+    		}
+    		else
+    		{
+    			EXEENTRYPOINT entryPoint = (EXEENTRYPOINT)((DWORD_PTR)lpAllocAddress + lpImageNTHeader->OptionalHeader.AddressOfEntryPoint);
+    			const BOOL result = entryPoint();
+    			if (!result)
+    			{
+    				return NULL;
+    			}
+    		}
+    	}
+    }
+    return (LPVOID)lpAllocAddress;
+}
+
+/* Manual InsertTailList */
+FORCE_INLINE VOID Manual_InsertTailList(PLIST_ENTRY ListHead, PLIST_ENTRY Entry)
+{
+    PLIST_ENTRY Blink = ListHead->Blink;
+    Entry->Flink = ListHead;
+    Entry->Blink = Blink;
+    Blink->Flink = Entry;
+    ListHead->Blink = Entry;
+}
+
+/**
+ *	Function to add PE module to list in PEB LDR.
+ *	\param moduleBase : Base address of module.
+ *	\param sizeOfImage : Size, in memory, of the module.
+ *	\param moduleName : Name of the module to add.
+ *	\return : if success TRUE, else FALSE.
+ */
+FORCE_INLINE BOOL AddModuleToPEB(PVOID moduleBase, ULONG sizeOfImage, LPCWSTR moduleName)
+{
+    PPEB peb = (PPEB)__readgsqword(0x60);
+    if (!peb || !peb->Ldr)
+        return FALSE;
+
+    PPEB_LDR_DATA ldr = peb->Ldr;
+
+    /* Get NtAllocateVirtualMemory */
+    PNtAllocateVirtualMemory nt_allocate_virtual_memory =
+        (PNtAllocateVirtualMemory)GetProcedureAddressNt("NtAllocateVirtualMemory\0");
+
+    if (!nt_allocate_virtual_memory)
+        return FALSE;
+
+    /* Allocate entry structure */
+    PLDR_DATA_TABLE_ENTRY entry = NULL;
+    SIZE_T entrySize = sizeof(LDR_DATA_TABLE_ENTRY);
+
+    NTSTATUS status = nt_allocate_virtual_memory(
+        NtCurrentProcess(),
+        (PVOID*)&entry,
+        0,
+        &entrySize,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_READWRITE
+    );
+
+    if (status != 0 || !entry)
+        return FALSE;
+
+    /* Zero the structure */
+    Manual_memset(entry, 0, sizeof(LDR_DATA_TABLE_ENTRY));
+
+    /* Setup entry */
+    entry->DllBase = moduleBase;
+    entry->SizeOfImage = sizeOfImage;
+    entry->ObsoleteLoadCount = 1;
+    entry->Flags = 0x00004000;
+
+    /* Calculate name buffer size */
+    SIZE_T nameLen = Manual_wcslen(moduleName);
+    SIZE_T bufSize = (nameLen + 1) * sizeof(WCHAR);
+
+    /* Allocate BaseDllName buffer */
+    PWSTR baseNameBuffer = nullptr;
+    SIZE_T baseNameSize = bufSize;
+
+    status = nt_allocate_virtual_memory(
+        NtCurrentProcess(),
+        (PVOID*)&baseNameBuffer,
+        0,
+        &baseNameSize,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_READWRITE
+    );
+
+    if (status != 0 || !baseNameBuffer)
+    {
+        /* Free entry */
+        entrySize = 0;
+        PNtFreeVirtualMemory nt_free_virtual_memory =
+            (PNtFreeVirtualMemory)GetProcedureAddressNt("NtFreeVirtualMemory\0");
+        if (nt_free_virtual_memory)
+            nt_free_virtual_memory(NtCurrentProcess(), (PVOID*)&entry, &entrySize, MEM_RELEASE);
+        return FALSE;
+    }
+
+    Manual_wcscpy(baseNameBuffer, moduleName);
+    entry->BaseDllName.Buffer = baseNameBuffer;
+    entry->BaseDllName.Length = (USHORT)(nameLen * sizeof(WCHAR));
+    entry->BaseDllName.MaximumLength = (USHORT)bufSize;
+
+    /* Allocate FullDllName buffer */
+    PWSTR fullNameBuffer = nullptr;
+    SIZE_T fullNameSize = bufSize;
+
+    status = nt_allocate_virtual_memory(
+        NtCurrentProcess(),
+        (PVOID*)&fullNameBuffer,
+        0,
+        &fullNameSize,
+        MEM_COMMIT | MEM_RESERVE,
+        PAGE_READWRITE
+    );
+
+    if (status != 0 || !fullNameBuffer)
+    {
+        /* Free previous allocations */
+        PNtFreeVirtualMemory nt_free_virtual_memory =
+            (PNtFreeVirtualMemory)GetProcedureAddressNt("NtFreeVirtualMemory\0");
+        if (nt_free_virtual_memory)
+        {
+            baseNameSize = 0;
+            nt_free_virtual_memory(NtCurrentProcess(), (PVOID*)&baseNameBuffer, &baseNameSize, MEM_RELEASE);
+            entrySize = 0;
+            nt_free_virtual_memory(NtCurrentProcess(), (PVOID*)&entry, &entrySize, MEM_RELEASE);
+        }
+        return FALSE;
+    }
+
+    Manual_wcscpy(fullNameBuffer, moduleName);
+    entry->FullDllName.Buffer = fullNameBuffer;
+    entry->FullDllName.Length = (USHORT)(nameLen * sizeof(WCHAR));
+    entry->FullDllName.MaximumLength = (USHORT)bufSize;
+
+    /* Insert into PEB lists */
+    Manual_InsertTailList(&ldr->InLoadOrderModuleList, &entry->InLoadOrderLinks);
+    Manual_InsertTailList(&ldr->InMemoryOrderModuleList, &entry->InMemoryOrderLinks);
+    Manual_InsertTailList(&ldr->InInitializationOrderModuleList, &entry->InInitializationOrderLinks);
+
+    return TRUE;
+}
+
+//Could Add : FreeMemory After Execution
+#ifdef DEBUG_CONST
+ULONG_PTR mainCRTStartup(VOID)
+{
+	LPVOID lpModuleDll = LoadPE(DelayLoad, USE_NT_CREATE_SECTION_FOR_ALLOCATION);//LoadPE(DelayLoad, CLASSIC);//USE_NT_CREATE_SECTION_FOR_ALLOCATION
+
+	if (lpModuleDll == NULL)
+		return -1;
+
+	LPVOID lpModuleExe = LoadPE(DelayLoadExe, CLASSIC);//CALL_ENTRY_POINT | THREADED_ENTRY_POINT
+
+	PIMAGE_DOS_HEADER pDos = (PIMAGE_DOS_HEADER)lpModuleDll;
+	PIMAGE_NT_HEADERS pNt = (PIMAGE_NT_HEADERS)((BYTE*)lpModuleDll + pDos->e_lfanew);
+
+	AddModuleToPEB(lpModuleDll, pNt->OptionalHeader.SizeOfImage, L"MyModule.dll");
+
+	if (lpModuleExe == NULL)
+		return -1;
+
+	//this may be not called since original exe calls ucrtbase.exit
+    HANDLE p_std_out = ((PPEB)NtCurrentPeb())->ProcessParameters->StandardInput;
+    CHAR unused_char[16];
+    IO_STATUS_BLOCK status;
+    PNtReadFile p_nt_read_file = (PNtReadFile)GetProcedureAddressNt("NtReadFile\0");
+    p_nt_read_file(p_std_out, nullptr, nullptr, nullptr, &status, &unused_char[0], 32, nullptr, nullptr);
+    return (ULONG_PTR)0x0;
+}
+#else
+ULONG_PTR mainCRTStartup(HANDLE lpPEData, ULONG flags, WCHAR* module_name)
+{
+	LPVOID lpModule = LoadPE(lpPEData, flags);
 
 	if (lpModule == NULL)
 		return -1;
-
-	system("PAUSE");
-
-	return 0;
+	else
+	{
+		if((flags & LINK_TO_PEB_LDR))
+		{
+			PIMAGE_DOS_HEADER pDos = (PIMAGE_DOS_HEADER)lpModule;
+			PIMAGE_NT_HEADERS pNt = (PIMAGE_NT_HEADERS)((BYTE*)lpModule + pDos->e_lfanew);
+			AddModuleToPEB(lpModule, pNt->OptionalHeader.SizeOfImage, module_name);
+		}
+		return (ULONG_PTR)lpModule;
+	}
 }
+#endif

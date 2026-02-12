@@ -15,6 +15,492 @@ typedef struct _UNICODE_STRING
 #define ZwCurrentSession() NtCurrentSession()
 
 /**
+ * Manual implementation of MultiByteToWideChar
+ * Converts multibyte character string to wide character string
+ *
+ * @param CodePage - Code page to use (CP_ACP, CP_UTF8, etc.)
+ * @param dwFlags - Conversion flags
+ * @param lpMultiByteStr - Source multibyte string
+ * @param cbMultiByte - Length of source string (-1 for null-terminated)
+ * @param lpWideCharStr - Destination wide char buffer (NULL to get required size)
+ * @param cchWideChar - Size of destination buffer in WCHARs
+ * @return Number of WCHARs written, or required size if lpWideCharStr is NULL
+ */
+int Manual_MultiByteToWideChar(
+    UINT CodePage,
+    DWORD dwFlags,
+    LPCSTR lpMultiByteStr,
+    int cbMultiByte,
+    LPWSTR lpWideCharStr,
+    int cchWideChar)
+{
+    int sourceLen;
+    int i;
+    int requiredSize;
+
+    /* Validate input */
+    if (lpMultiByteStr == NULL)
+        return 0;
+
+    /* Calculate source length if not provided */
+    if (cbMultiByte == -1)
+    {
+        sourceLen = 0;
+        while (lpMultiByteStr[sourceLen] != '\0')
+            sourceLen++;
+        sourceLen++; /* Include null terminator */
+    }
+    else
+    {
+        sourceLen = cbMultiByte;
+    }
+
+    /* If only querying size, return required buffer size */
+    if (lpWideCharStr == NULL || cchWideChar == 0)
+    {
+        return sourceLen; /* For ASCII/ANSI, 1 byte = 1 wchar */
+    }
+
+    /* Simple ASCII/ANSI conversion (most common case) */
+    if (CodePage == CP_ACP || CodePage == 0)
+    {
+        requiredSize = sourceLen;
+
+        /* Check if buffer is large enough */
+        if (cchWideChar < requiredSize)
+            return 0; /* Buffer too small */
+
+        /* Convert byte by byte */
+        for (i = 0; i < sourceLen; i++)
+        {
+            lpWideCharStr[i] = (WCHAR)(unsigned char)lpMultiByteStr[i];
+        }
+
+        return sourceLen;
+    }
+
+    /* UTF-8 conversion (CP_UTF8 = 65001) */
+    if (CodePage == CP_UTF8 || CodePage == 65001)
+    {
+        int srcIdx = 0;
+        int dstIdx = 0;
+
+        /* First pass: calculate required size */
+        srcIdx = 0;
+        requiredSize = 0;
+
+        while (srcIdx < sourceLen)
+        {
+            unsigned char c = (unsigned char)lpMultiByteStr[srcIdx];
+
+            if (c == 0)
+            {
+                requiredSize++;
+                break;
+            }
+            else if (c < 0x80)
+            {
+                /* 1-byte sequence (ASCII) */
+                requiredSize++;
+                srcIdx++;
+            }
+            else if ((c & 0xE0) == 0xC0)
+            {
+                /* 2-byte sequence */
+                requiredSize++;
+                srcIdx += 2;
+            }
+            else if ((c & 0xF0) == 0xE0)
+            {
+                /* 3-byte sequence */
+                requiredSize++;
+                srcIdx += 3;
+            }
+            else if ((c & 0xF8) == 0xF0)
+            {
+                /* 4-byte sequence (surrogate pair needed) */
+                requiredSize += 2;
+                srcIdx += 4;
+            }
+            else
+            {
+                /* Invalid UTF-8 sequence */
+                requiredSize++;
+                srcIdx++;
+            }
+        }
+
+        /* If only querying size */
+        if (lpWideCharStr == NULL || cchWideChar == 0)
+            return requiredSize;
+
+        /* Check buffer size */
+        if (cchWideChar < requiredSize)
+            return 0;
+
+        /* Second pass: actual conversion */
+        srcIdx = 0;
+        dstIdx = 0;
+
+        while (srcIdx < sourceLen && dstIdx < cchWideChar)
+        {
+            unsigned char c = (unsigned char)lpMultiByteStr[srcIdx];
+
+            if (c == 0)
+            {
+                lpWideCharStr[dstIdx++] = 0;
+                break;
+            }
+            else if (c < 0x80)
+            {
+                /* 1-byte: 0xxxxxxx */
+                lpWideCharStr[dstIdx++] = (WCHAR)c;
+                srcIdx++;
+            }
+            else if ((c & 0xE0) == 0xC0)
+            {
+                /* 2-byte: 110xxxxx 10xxxxxx */
+                if (srcIdx + 1 < sourceLen)
+                {
+                    unsigned char c2 = (unsigned char)lpMultiByteStr[srcIdx + 1];
+                    WCHAR wc = ((c & 0x1F) << 6) | (c2 & 0x3F);
+                    lpWideCharStr[dstIdx++] = wc;
+                    srcIdx += 2;
+                }
+                else
+                {
+                    lpWideCharStr[dstIdx++] = L'?';
+                    srcIdx++;
+                }
+            }
+            else if ((c & 0xF0) == 0xE0)
+            {
+                /* 3-byte: 1110xxxx 10xxxxxx 10xxxxxx */
+                if (srcIdx + 2 < sourceLen)
+                {
+                    unsigned char c2 = (unsigned char)lpMultiByteStr[srcIdx + 1];
+                    unsigned char c3 = (unsigned char)lpMultiByteStr[srcIdx + 2];
+                    WCHAR wc = ((c & 0x0F) << 12) | ((c2 & 0x3F) << 6) | (c3 & 0x3F);
+                    lpWideCharStr[dstIdx++] = wc;
+                    srcIdx += 3;
+                }
+                else
+                {
+                    lpWideCharStr[dstIdx++] = L'?';
+                    srcIdx++;
+                }
+            }
+            else if ((c & 0xF8) == 0xF0)
+            {
+                /* 4-byte: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx */
+                /* Requires surrogate pair for UTF-16 */
+                if (srcIdx + 3 < sourceLen && dstIdx + 1 < cchWideChar)
+                {
+                    unsigned char c2 = (unsigned char)lpMultiByteStr[srcIdx + 1];
+                    unsigned char c3 = (unsigned char)lpMultiByteStr[srcIdx + 2];
+                    unsigned char c4 = (unsigned char)lpMultiByteStr[srcIdx + 3];
+
+                    unsigned int codepoint = ((c & 0x07) << 18) |
+                        ((c2 & 0x3F) << 12) |
+                        ((c3 & 0x3F) << 6) |
+                        (c4 & 0x3F);
+
+                    if (codepoint > 0xFFFF)
+                    {
+                        /* Create surrogate pair */
+                        codepoint -= 0x10000;
+                        lpWideCharStr[dstIdx++] = (WCHAR)(0xD800 + (codepoint >> 10));
+                        lpWideCharStr[dstIdx++] = (WCHAR)(0xDC00 + (codepoint & 0x3FF));
+                    }
+                    else
+                    {
+                        lpWideCharStr[dstIdx++] = (WCHAR)codepoint;
+                    }
+                    srcIdx += 4;
+                }
+                else
+                {
+                    lpWideCharStr[dstIdx++] = L'?';
+                    srcIdx++;
+                }
+            }
+            else
+            {
+                /* Invalid UTF-8, replace with ? */
+                lpWideCharStr[dstIdx++] = L'?';
+                srcIdx++;
+            }
+        }
+
+        return dstIdx;
+    }
+
+    /* Unsupported code page - fallback to simple conversion */
+    requiredSize = sourceLen;
+    if (cchWideChar < requiredSize)
+        return 0;
+
+    for (i = 0; i < sourceLen; i++)
+    {
+        lpWideCharStr[i] = (WCHAR)(unsigned char)lpMultiByteStr[i];
+    }
+
+    return sourceLen;
+}
+
+/**
+ * Manual implementation of strchr
+ * Finds the first occurrence of a character in a string
+ *
+ * @param str - String to search in
+ * @param c - Character to find
+ * @return Pointer to first occurrence, or NULL if not found
+ */
+char* Manual_strchr(const char* str, int c)
+{
+    if (str == NULL)
+        return NULL;
+
+    while (*str != '\0')
+    {
+        if (*str == (char)c)
+            return (char*)str;
+        str++;
+    }
+
+    /* Check if looking for null terminator */
+    if ((char)c == '\0')
+        return (char*)str;
+
+    return NULL;
+}
+
+/**
+ * Manual implementation of strncpy_s
+ * Safely copies up to n characters from source to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string
+ * @param count - Maximum number of characters to copy
+ * @return 0 on success, error code on failure
+ */
+int Manual_strncpy_s(char* dest, size_t destSize, const char* src, size_t count)
+{
+    size_t i;
+
+    /* Validate parameters */
+    if (dest == NULL || destSize == 0)
+        return 22; /* EINVAL */
+
+    if (src == NULL)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Determine how many characters to actually copy */
+    size_t copyCount = count;
+    if (count == (size_t)-1 || count >= destSize)
+    {
+        copyCount = destSize - 1; /* Leave room for null terminator */
+    }
+
+    /* Copy characters */
+    for (i = 0; i < copyCount && src[i] != '\0'; i++)
+    {
+        dest[i] = src[i];
+    }
+
+    /* Null terminate */
+    if (i < destSize)
+        dest[i] = '\0';
+    else
+        dest[destSize - 1] = '\0';
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of strcat_s
+ * Safely concatenates source string to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string to append
+ * @return 0 on success, error code on failure
+ */
+int Manual_strcat_s(char* dest, size_t destSize, const char* src)
+{
+    size_t destLen;
+    size_t i;
+
+    /* Validate parameters */
+    if (dest == NULL || destSize == 0)
+        return 22; /* EINVAL */
+
+    if (src == NULL)
+        return 22; /* EINVAL */
+
+    /* Find end of destination string */
+    destLen = 0;
+    while (destLen < destSize && dest[destLen] != '\0')
+        destLen++;
+
+    /* Check if destination is already full or not null-terminated */
+    if (destLen >= destSize)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Copy source to end of destination */
+    i = 0;
+    while (src[i] != '\0' && (destLen + i + 1) < destSize)
+    {
+        dest[destLen + i] = src[i];
+        i++;
+    }
+
+    /* Null terminate */
+    dest[destLen + i] = '\0';
+
+    /* Check if we truncated */
+    if (src[i] != '\0')
+        return 34; /* ERANGE - buffer too small */
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of strcpy_s
+ * Safely copies source string to destination
+ *
+ * @param dest - Destination buffer
+ * @param destSize - Size of destination buffer
+ * @param src - Source string
+ * @return 0 on success, error code on failure
+ */
+int Manual_strcpy_s(char* dest, size_t destSize, const char* src)
+{
+    size_t i;
+
+    /* Validate parameters */
+    if (dest == NULL || destSize == 0)
+        return 22; /* EINVAL */
+
+    if (src == NULL)
+    {
+        dest[0] = '\0';
+        return 22; /* EINVAL */
+    }
+
+    /* Copy characters */
+    for (i = 0; i < destSize - 1 && src[i] != '\0'; i++)
+    {
+        dest[i] = src[i];
+    }
+
+    /* Null terminate */
+    dest[i] = '\0';
+
+    /* Check if truncated */
+    if (i == destSize - 1 && src[i] != '\0')
+        return 34; /* ERANGE */
+
+    return 0; /* Success */
+}
+
+/**
+ * Manual implementation of atoi
+ * Converts string to integer
+ *
+ * @param str - String to convert
+ * @return Integer value, or 0 if invalid
+ */
+int Manual_atoi(const char* str)
+{
+    int result = 0;
+    int sign = 1;
+    int i = 0;
+
+    if (str == NULL)
+        return 0;
+
+    /* Skip leading whitespace */
+    while (str[i] == ' ' || str[i] == '\t' || str[i] == '\n' ||
+        str[i] == '\r' || str[i] == '\v' || str[i] == '\f')
+    {
+        i++;
+    }
+
+    /* Handle sign */
+    if (str[i] == '-')
+    {
+        sign = -1;
+        i++;
+    }
+    else if (str[i] == '+')
+    {
+        i++;
+    }
+
+    /* Convert digits */
+    while (str[i] >= '0' && str[i] <= '9')
+    {
+        result = result * 10 + (str[i] - '0');
+        i++;
+    }
+
+    return result * sign;
+}
+
+/**
+ * Manual implementation of strlen (bonus)
+ * Gets the length of a string
+ *
+ * @param str - String to measure
+ * @return Length in characters (excluding null terminator)
+ */
+size_t Manual_strlen(const char* str)
+{
+    size_t len = 0;
+
+    if (str == NULL)
+        return 0;
+
+    while (str[len] != '\0')
+        len++;
+
+    return len;
+}
+
+/**
+ * Manual implementation of strcmp (bonus)
+ * Compares two strings
+ *
+ * @param str1 - First string
+ * @param str2 - Second string
+ * @return 0 if equal, <0 if str1<str2, >0 if str1>str2
+ */
+int Manual_strcmp(const char* str1, const char* str2)
+{
+    if (str1 == NULL || str2 == NULL)
+        return (str1 == str2) ? 0 : (str1 == NULL ? -1 : 1);
+
+    while (*str1 != '\0' && *str2 != '\0')
+    {
+        if (*str1 != *str2)
+            return (unsigned char)*str1 - (unsigned char)*str2;
+        str1++;
+        str2++;
+    }
+
+    return (unsigned char)*str1 - (unsigned char)*str2;
+}
+
+
+/**
  *	Function to check if the image is a valid PE file.
  *	\param lpImage : PE image data.
  *	\return : TRUE if the image is a valid PE else no.
@@ -124,7 +610,7 @@ BOOL ProcessDelayImports(const LPVOID lpImage)
 
         // Convert ANSI library name to wide char
 
-        MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
+        Manual_MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
 
         // Initialize UNICODE_STRING with the library name
         RtlInitUnicodeString(&uModuleName, wLibraryName);
@@ -195,7 +681,7 @@ BOOL ProcessLoadConfig(const LPVOID lpImage)
     if (ImageDataLoadConfig.VirtualAddress == 0 || ImageDataLoadConfig.Size == 0)
     {
         printf("[+] No Load Config directory found.\n");
-        return TRUE;
+        return FALSE;
     }
 
     printf("[+] Processing Load Config directory...\n");
@@ -420,7 +906,7 @@ LPVOID GetFunctionAddressEx(const LPVOID lpModule, const LPSTR lpFunctionName)
         WORD lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
         DWORD addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
 
-        if (strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+        if (Manual_strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
         {
             // Check if this is a forwarded export
             if (addRVA >= dwExportDirStart && addRVA < dwExportDirEnd)
@@ -433,22 +919,42 @@ LPVOID GetFunctionAddressEx(const LPVOID lpModule, const LPSTR lpFunctionName)
                 char szForwardDll[256] = { 0 };
                 char szForwardFunction[256] = { 0 };
 
-                char* lpDot = strchr(lpForwardString, '.');
+                char* lpDot = Manual_strchr(lpForwardString, '.');
                 if (lpDot != NULL)
                 {
                     size_t dllNameLen = lpDot - lpForwardString;
-                    strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
-                    strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
-                    strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+                    Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+                    Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+                    Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
 
                     // Load the forwarded DLL
-                    HMODULE hForwardModule = LoadLibraryA(szForwardDll);
+                    //HMODULE hForwardModule = LoadLibraryA(szForwardDll);
+
+                    HMODULE hForwardModule = NULL;
+                    NTSTATUS status;
+                    UNICODE_STRING uModuleName;
+                    WCHAR wLibraryName[MAX_PATH];
+
+                    // Convert ANSI library name to wide char
+                    Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+
+                    // Initialize UNICODE_STRING with the library name
+                    RtlInitUnicodeString(&uModuleName, wLibraryName);
+
+                    // Load the DLL using LdrLoadDll
+                    status = LdrLoadDll(
+                        NULL,           // PathToFile (NULL = use default search path)
+                        0,              // Flags (0 = default behavior)
+                        &uModuleName,   // ModuleFileName as UNICODE_STRING
+                        (PHANDLE)&hForwardModule  // Output handle to the loaded module
+                    );
+
                     if (hForwardModule != NULL)
                     {
                         // Check if forwarding to ordinal (starts with '#')
                         if (szForwardFunction[0] == '#')
                         {
-                            WORD ordinal = (WORD)atoi(szForwardFunction + 1);
+                            WORD ordinal = (WORD)Manual_atoi(szForwardFunction + 1);
                             return (LPVOID)GetProcAddressByOrdinal(hForwardModule, ordinal);
                         }
                         else
@@ -516,7 +1022,7 @@ LPVOID GetProcAddressByName(const HMODULE hModule, const LPSTR lpFunctionName)
     {
         const char* lpCurrentFunctionName = (const char*)((DWORD_PTR)hModule + lpAddressOfNames[i]);
 
-        if (strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+        if (Manual_strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
         {
             // Found the function - get its ordinal
             const WORD ordinal = lpAddressOfNameOrdinals[i];
@@ -532,13 +1038,13 @@ LPVOID GetProcAddressByName(const HMODULE hModule, const LPSTR lpFunctionName)
                 char szForwardDll[256] = { 0 };
                 char szForwardFunction[256] = { 0 };
 
-                char* lpDot = strchr(lpForwardString, '.');
+                char* lpDot = Manual_strchr(lpForwardString, '.');
                 if (lpDot != NULL)
                 {
                     size_t dllNameLen = lpDot - lpForwardString;
-                    strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
-                    strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
-                    strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+                    Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+                    Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+                    Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
 
                     // Load the forwarded DLL
                     //HMODULE hForwardModule = LoadLibraryA(szForwardDll);
@@ -549,7 +1055,7 @@ LPVOID GetProcAddressByName(const HMODULE hModule, const LPSTR lpFunctionName)
                     WCHAR wLibraryName[MAX_PATH];
 
                     // Convert ANSI library name to wide char
-                    MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+                    Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
 
                     // Initialize UNICODE_STRING with the library name
                     RtlInitUnicodeString(&uModuleName, wLibraryName);
@@ -567,7 +1073,7 @@ LPVOID GetProcAddressByName(const HMODULE hModule, const LPSTR lpFunctionName)
                         // Check if forwarding to ordinal (starts with '#')
                         if (szForwardFunction[0] == '#')
                         {
-                            WORD forwardOrdinal = (WORD)atoi(szForwardFunction + 1);
+                            WORD forwardOrdinal = (WORD)Manual_atoi(szForwardFunction + 1);
                             return GetProcAddressByOrdinal(hForwardModule, forwardOrdinal);
                         }
                         else
@@ -647,13 +1153,13 @@ LPVOID GetProcAddressByOrdinal(const HMODULE hModule, const WORD ordinal)
         char szForwardDll[256] = { 0 };
         char szForwardFunction[256] = { 0 };
 
-        char* lpDot = strchr(lpForwardString, '.');
+        char* lpDot = Manual_strchr(lpForwardString, '.');
         if (lpDot != NULL)
         {
             size_t dllNameLen = lpDot - lpForwardString;
-            strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
-            strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
-            strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
+            Manual_strncpy_s(szForwardDll, sizeof(szForwardDll), lpForwardString, dllNameLen);
+            Manual_strcat_s(szForwardDll, sizeof(szForwardDll), ".dll");
+            Manual_strcpy_s(szForwardFunction, sizeof(szForwardFunction), lpDot + 1);
 
             //HMODULE hForwardModule = LoadLibraryA(szForwardDll);
 
@@ -663,7 +1169,7 @@ LPVOID GetProcAddressByOrdinal(const HMODULE hModule, const WORD ordinal)
             WCHAR wLibraryName[MAX_PATH];
 
             // Convert ANSI library name to wide char
-            MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
+            Manual_MultiByteToWideChar(CP_ACP, 0, szForwardDll, -1, wLibraryName, MAX_PATH);
 
             // Initialize UNICODE_STRING with the library name
             RtlInitUnicodeString(&uModuleName, wLibraryName);
@@ -680,7 +1186,7 @@ LPVOID GetProcAddressByOrdinal(const HMODULE hModule, const WORD ordinal)
             {
                 if (szForwardFunction[0] == '#')
                 {
-                    WORD forwardOrdinal = (WORD)atoi(szForwardFunction + 1);
+                    WORD forwardOrdinal = (WORD)Manual_atoi(szForwardFunction + 1);
                     return GetProcAddressByOrdinal(hForwardModule, forwardOrdinal);
                 }
                 else
@@ -719,7 +1225,7 @@ LPVOID GetFunctionAddress(const LPVOID lpModule, const LPSTR lpFunctionName)
         LPSTR lpCurrentFunctionName = (LPSTR)(((DWORD*)(lpImageExportDirectory->AddressOfNames + (DWORD_PTR)lpModule))[i] + (DWORD_PTR)lpModule);
         WORD lpCurrentOridnal = ((WORD*)(lpImageExportDirectory->AddressOfNameOrdinals + (DWORD_PTR)lpModule))[i];
         DWORD addRVA = ((DWORD*)((DWORD_PTR)lpModule + lpImageExportDirectory->AddressOfFunctions))[lpCurrentOridnal];
-        if (strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
+        if (Manual_strcmp(lpCurrentFunctionName, lpFunctionName) == 0)
             return (LPVOID)((DWORD_PTR)lpModule + addRVA);
     }
 
@@ -971,7 +1477,7 @@ LPVOID LoadPE(const HANDLE lpPEData)
             WCHAR wLibraryName[MAX_PATH];
 
             // Convert ANSI library name to wide char
-            MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
+            Manual_MultiByteToWideChar(CP_ACP, 0, lpLibraryName, -1, wLibraryName, MAX_PATH);
 
             // Initialize UNICODE_STRING with the library name
             RtlInitUnicodeString(&uModuleName, wLibraryName);

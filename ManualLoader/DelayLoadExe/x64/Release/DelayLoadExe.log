@@ -1,6 +1,0 @@
-﻿  DelayLoadExe.c
-  Generating code
-  Previous IPDB and IOBJ mismatch, fall back to full compilation.
-  All 5 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  Finished generating code
-  DelayLoadExe.vcxproj -> C:\Users\arsium\Desktop\Exploit\ManualLoader\x64\Release\DelayLoadExe.exe

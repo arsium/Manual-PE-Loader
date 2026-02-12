@@ -1,0 +1,3 @@
+C:/Users/Arsium/Desktop/Exploit/ManualLoader/Native Manual Loader GCC/cmake-build-release-op/CMakeFiles/minimal_pe.dir
+C:/Users/Arsium/Desktop/Exploit/ManualLoader/Native Manual Loader GCC/cmake-build-release-op/CMakeFiles/edit_cache.dir
+C:/Users/Arsium/Desktop/Exploit/ManualLoader/Native Manual Loader GCC/cmake-build-release-op/CMakeFiles/rebuild_cache.dir
