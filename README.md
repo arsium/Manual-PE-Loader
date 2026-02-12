@@ -31,3 +31,7 @@ Later, this project will be converted in C to use native function only.
 #define THREADED_ENTRY_POINT						0x00000004  //set to execute entrypoint with NtCreateThreadex (EXE ONLY)
 #define LINK_TO_PEB_LDR								0x00000008  //if set, specify a name as 3rd argument to shellcode	
 ```
+
+## Example with linked to PEB
+
+![PEBLINKED](https://github.com/arsium/Manual-PE-Loader/blob/main/LinkedToPEB.png?raw=true)
